@@ -7,12 +7,11 @@ params.reference_fa = '~/projects/mQTL/GSA/resources/GRCh37_genome.fa'
 params.CPUs = '20'
 
 params.gsa_idats_dir = 'GSA/'
-params.epic_idats_dir = 'EPIC/'
 params.results_dir = 'results/'
 
 
 log.info """\
-            mQTL v1.0 PIPELINE
+            mQTL v1.0 Worklow one [SNPs arrays]
             ==============
             
             Config:
@@ -26,7 +25,6 @@ log.info """\
             Input:
             ==============
             GSA idats: ${params.gsa_idats_dir}
-            EPIC idats: ${params.epic_idats_dir}
             
             Output:
             ==============
