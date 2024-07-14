@@ -10,6 +10,7 @@ This Nextflow project is designed to identify methylation quantitative trait loc
 #### Workflow two: SNP Array Data Preprocessing
 The first workflow preprocesses SNP array data from Illumina microarrays. It involves the following steps:
 
+```
 0. Sanity check (not implemented yet)
 1. Convert idat to gtc: Convert raw idat files to gtc format.
 2. Convert gtc to vcf: Convert gtc files to VCF format.
@@ -19,6 +20,7 @@ The first workflow preprocesses SNP array data from Illumina microarrays. It inv
     2. Apply filters: minor allele frequency (--maf 0.05), Hardy-Weinberg equilibrium (--hwe 1e-50), genotype missingness (--geno 0.1), and autosome restriction.
     3. Recode to a transposed format.
 5. Exporting results files (merged.bcf, *.frq as well as *.traw).
+```
 
 Workflow Params:
 
@@ -48,19 +50,22 @@ Note: This workflow is not yet implemented.
 
 This workflow will preprocess methylation array data from Illumina. Planned steps include:
 
+```
 0. Sanity check
 1. Sesame preprocessing: use the Sesame R package for preprocessing the methylation data.
 2. Cell fraction correction: use linear models to adjust for cellular composition in the samples.
+```
 
 #### Workflow three: mQTL Identification
 Note: This workflow is not yet implemented.
 
 This workflow will analyze data from flow_one and flow_two to identify mQTLs. Planned steps include:
 
+```
 1. mQTL analysis: Integrate genetic and methylation data to identify mQTLs.
 2. Clumping: Perform clumping to group SNPs based on linkage disequilibrium.
 3. Enrichment analysis: Conduct enrichment analysis to interpret the biological significance of the identified mQTLs.
-
+```
 
 ### Getting Started
 
@@ -78,9 +83,7 @@ To run the workflows, use the following Nextflow command:
 
 
 ```
-
 nextflow run <workflow_name> -with-apptainer <workflow-specific-params>
-
 ```
 
 #### Workflow Configuration
