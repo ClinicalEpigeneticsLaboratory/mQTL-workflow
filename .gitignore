@@ -1,0 +1,14 @@
+# Nextflow cache
+work/
+.nextflow*
+
+# Raw data
+EPIC/
+GSA/
+
+# Processed data
+results/
+
+# Jupyter files
+.ipynb_checkpoints/
+ 
