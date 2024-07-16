@@ -5,10 +5,14 @@ work/
 # Raw data
 EPIC/
 GSA/
+*.csv
 
 # Processed data
 results/
 
 # Jupyter files
 .ipynb_checkpoints/
- 
+notebooks/
+
+# Cache
+*.save
