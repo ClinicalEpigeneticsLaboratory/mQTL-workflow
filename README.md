@@ -33,7 +33,7 @@ docker run -it r-image
 # R version 4.4.1 (2024-06-14) -- "Race for Your Life"
 ```
 
-#### Workflow one: SNP Array Data Preprocessing
+### Workflow one: SNP Array Data Preprocessing
 The first workflow preprocesses SNP array data from Illumina microarrays. It involves the following steps:
 
 ```
@@ -97,7 +97,7 @@ Output:
 results directory: results/
 ```
 
-#### Workflow two: Methylation Array Data Preprocessing
+### Workflow two: Methylation Array Data Preprocessing
 Note: This workflow is not yet implemented.
 
 This workflow will preprocess methylation array data from Illumina. Planned steps include:
@@ -108,7 +108,7 @@ This workflow will preprocess methylation array data from Illumina. Planned step
 2. Cell fraction correction: use linear models to adjust for cellular composition in the samples.
 ```
 
-#### Workflow three: mQTL Identification
+### Workflow three: mQTL Identification
 Note: This workflow is not yet implemented.
 
 This workflow will analyze data from flow_one and flow_two to identify mQTLs. Planned steps include:
