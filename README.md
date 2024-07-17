@@ -25,7 +25,7 @@ docker build -t mqtl-image .
 To validate builds:
 
 ```
-docker run -it python-image
+docker run -it mqtl-image
 ```
 
 ### Workflow one: SNP Array Data Preprocessing
