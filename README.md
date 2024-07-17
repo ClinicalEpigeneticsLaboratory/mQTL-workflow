@@ -33,7 +33,7 @@ docker run -it r-image
 # R version 4.4.1 (2024-06-14) -- "Race for Your Life"
 ```
 
-#### Workflow two: SNP Array Data Preprocessing
+#### Workflow one: SNP Array Data Preprocessing
 The first workflow preprocesses SNP array data from Illumina microarrays. It involves the following steps:
 
 ```
