@@ -1,4 +1,5 @@
-#!/usr/local/bin/python
+#!/usr/local/bin/python3.10
+
 import sys
 import shutil
 from os import makedirs

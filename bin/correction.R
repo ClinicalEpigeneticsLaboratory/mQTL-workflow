@@ -1,19 +1,19 @@
-# Function to perform cell-fraction correction based on ChAMP implentation and RPC method from
-# EpiDISH package.
+#!/usr/local/bin/R
 
 library("EpiDISH")
 library("arrow")
 library("dplyr")
 
 args = commandArgs(trailingOnly=TRUE)
-message("Input: ", args[1], "\n",
-        "output mynorm: ", args[2], "\n", 
-        "output cell proprotions estimation: ", args[3],
-        "\n")
 
 mynorm_input = args[1]
 mynorm_output = args[2]
 cfp_output_dir = args[3]
+
+message("Input: ", mynorm_input, "\n",
+        "output mynorm: ", mynorm_output, "\n", 
+        "output cell proprotions estimation: ", cfp_output_dir,
+        "\n")
 
 # Function implementation
 modified_refBase <- function(beta, method="RPC"){
