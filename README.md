@@ -65,11 +65,11 @@ nextflow run flow_one.nf --bmp_manifest <path> --csv_manifest <path> --cluster_f
 - array_position: sample sheet column name containing information about array position (sentrix ID and sentrix position) e.g. `205723740073_R03C02`
 - sample_name: sample sheet column name containing sample name
 
-**NOTE** Only IDATs common between `gsa_idats_dir/` and  `sample_sheet` are going to be analysed!
+**IMPORTANT NOTE:** Only IDATs common between `gsa_idats_dir/` and  `sample_sheet` are going to be analysed!
 
-**NOTE** BMP manifest, CSV manifest as well as cluster file are product specific files therefore should be downloaded from Illumina Product Files page e.g. [GSA v3.0](https://emea.support.illumina.com/downloads/infinium-global-screening-array-v3-0-product-files.html)
+**IMPORTANT NOTE:** BMP manifest, CSV manifest as well as cluster file are product specific files therefore should be downloaded from Illumina Product Files page e.g. [GSA v3.0](https://emea.support.illumina.com/downloads/infinium-global-screening-array-v3-0-product-files.html)
 
-**NOTE** Reference genome should be hg19 for EPICv1 and hg38 for EPICv2, and downloaded from [iGenomes](https://emea.support.illumina.com/sequencing/sequencing_software/igenome.html)
+**IMPORTANT NOTE:** Reference genome should be hg19 for EPICv1 and hg38 for EPICv2, and downloaded from [iGenomes](https://emea.support.illumina.com/sequencing/sequencing_software/igenome.html)
 
 Workflow config example:
 
