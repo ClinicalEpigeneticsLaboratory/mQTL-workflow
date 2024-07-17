@@ -1,0 +1,12 @@
+# Data
+EPIC/
+GSA/
+*.idat
+
+# Cache
+*.save
+
+# Jupyter
+notebooks/
+*.ipynb
+
