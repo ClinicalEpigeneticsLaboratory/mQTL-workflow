@@ -1,5 +1,19 @@
 #!/usr/bin/env nextflow
 
+// Workflow Params
+// CLI params - array specific options
+params.bmp_manifest = 'resources/GSA-24v3-0_A1.bpm'
+params.csv_manifest = 'resources/GSA-24v3-0_A1.csv'
+params.cluster_file = 'resources/GSA-24v3-0_A1_ClusterFile.egt'
+params.reference_fa = 'resources/GRCh37_genome.fa'
+
+// CLI params - experiment specific options
+params.gsa_idats_dir = 'GSA/'
+params.results_dir = 'results/'
+params.sample_sheet = 'sample_sheet.csv'
+params.array_position = 'ArrayPicker'
+params.sample_name = 'Sample_Name'
+
 log.info """\
             mQTL v1.0 Worklow one [SNPs arrays]
             ==============
