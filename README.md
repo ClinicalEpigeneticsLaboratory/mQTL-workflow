@@ -15,22 +15,17 @@ Ensure you have the following software installed:
 - Docker
 
 #### Docker Container
-This projects contains two docker containers for Python3.10 as well as R4.4 environment used as execution environment for Nextflow pipelines.
-To build images, use the following commands:
+This projects contains docker image mainly for Python3.10 as well as R4.4 used as execution environment for Nextflow pipelines.
+To build image, use the following command:
 
 ```
-docker build -t python-image -f containers/python_env .
-docker build -t r-image -f containers/R_env .
+docker build -t mqtl-image .
 ```
 
 To validate builds:
 
 ```
 docker run -it python-image
-# Python 3.10.14
-
-docker run -it r-image
-# R version 4.4.1 (2024-06-14) -- "Race for Your Life"
 ```
 
 ### Workflow one: SNP Array Data Preprocessing
@@ -51,14 +46,14 @@ The first workflow preprocesses SNP array data from Illumina microarrays. It inv
 Workflow command:
 
 ```
-nextflow run flow_one.nf --bmp_manifest <path> --csv_manifest <path> --cluster_file <path> --reference_fa <path> --CPUs <int> --gsa_idats_dir <path> --results_dir <path> --sample_sheet <path> --array_position <str> --sample_name <str> -with-docker python-image
+nextflow run flow_one.nf --bmp_manifest <path> --csv_manifest <path> --cluster_file <path> --reference_fa <path> --CPUs <int> --gsa_idats_dir <path> --results_dir <path> --sample_sheet <path> --array_position <str> --sample_name <str>
 ```
 
 - bmp_manifest: path to GSA array specific BMP manifest file
 - csv_manifest: path to GSA array specific CSV manifest file
 - cluster_file: path to GSA array specific cluster file
 - reference_fa: path to reference genome
-- CPUs: number of CPUs to use, should be psoitive integer 
+- CPUs: number of CPUs to use, should be positive integer 
 - gsa_idats_dir: directory comprising GSA idats to analyse
 - results_dir: results directory
 - sample_sheet: sample sheet contianing at least info about `sample name` and `array position`
@@ -69,7 +64,7 @@ nextflow run flow_one.nf --bmp_manifest <path> --csv_manifest <path> --cluster_f
 
 **IMPORTANT NOTE:** BMP manifest, CSV manifest as well as cluster file are product specific files therefore should be downloaded from Illumina Product Files page e.g. [GSA v3.0](https://emea.support.illumina.com/downloads/infinium-global-screening-array-v3-0-product-files.html)
 
-**IMPORTANT NOTE:** Reference genome should be hg19 for EPICv1 and hg38 for EPICv2, and downloaded from [iGenomes](https://emea.support.illumina.com/sequencing/sequencing_software/igenome.html)
+**IMPORTANT NOTE:** Reference genome should be downloaded from [iGenomes](https://emea.support.illumina.com/sequencing/sequencing_software/igenome.html)
 
 Workflow config example:
 
@@ -98,14 +93,49 @@ results directory: results/
 ```
 
 ### Workflow two: Methylation Array Data Preprocessing
-Note: This workflow is not yet implemented.
 
-This workflow will preprocess methylation array data from Illumina. Planned steps include:
+This workflow will preprocess methylation array data from Illumina. It involves the following steps:
 
 ```
 0. Sanity check
-1. Sesame preprocessing: use the Sesame R package for preprocessing the methylation data.
-2. Cell fraction correction: use linear models to adjust for cellular composition in the samples.
+1. Sesame preprocessing: use the Sesame R package for preprocessing (prep code: QCDPB) the methylation data.
+2. Cell fraction correction: use linear models to adjust for cellular composition in the samples. [OPTIONAL]
+3. Exporting normalized or normalized AND adjusted for tissue composition beta-matrix frame (mynorm.parquet).
+```
+
+Workflow command:
+
+```
+nextflow run flow_two.nf --CPUs <int> --methylation_idats_dir <path> --results_dir <path> --sample_sheet <path> --array_position <str> --sample_name <str>
+```
+
+- CPUs: number of CPUs to use, should be positive integer 
+- methylation_idats_dir: directory comprising EPIC2/EPIC/450K idats to analyse
+- results_dir: results directory
+- sample_sheet: sample sheet contianing at least info about `sample name` and `array position`
+- array_position: sample sheet column name containing information about array position (sentrix ID and sentrix position) e.g. `205723740073_R03C02`
+- sample_name: sample sheet column name containing sample name
+
+Workflow config example:
+
+```
+mQTL v1.0 Worklow two [Methylation arrays]
+==============
+
+Config:
+==============
+Number of CPUs: 20
+
+Input:
+==============
+Methylation idats: EPIC/
+Sample sheet: sample_sheet.csv
+Array position column: SentrixInfo
+Sample name column: Sample_Name
+
+Output:
+==============
+results directory: results/
 ```
 
 ### Workflow three: mQTL Identification
@@ -116,7 +146,7 @@ This workflow will analyze data from flow_one and flow_two to identify mQTLs. Pl
 ```
 1. mQTL analysis: Integrate genetic and methylation data to identify mQTLs.
 2. Clumping: Perform clumping to group SNPs based on linkage disequilibrium.
-3. Enrichment analysis: Conduct enrichment analysis to interpret the biological significance of the identified mQTLs.
+3. Enrichment analysis: Conduct enrichment analysis to interpret the biological significance of the identified mQTLs. [VEP]
 ```
 
 ### Contributing
