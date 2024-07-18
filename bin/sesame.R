@@ -13,8 +13,6 @@ library(BiocParallel)
 library(sesame)
 library(arrow)
 
-sesameDataCache("idatSignature")
-
 message("Running: ", data_path)
 message("n CPUs: ", n_cpus)
 message("Loading idats")

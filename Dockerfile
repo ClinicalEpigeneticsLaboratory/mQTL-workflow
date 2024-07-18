@@ -57,9 +57,9 @@ COPY requirements.R poetry.lock pyproject.toml info.sh .
 # Install R components
 # R is nightmare ...
 ENV EXPERIMENT_HUB_CACHE="/usr/local/.ExperimentHub"
-ENV ANNOTATION_HUB_CACHE="/usr/local/.AnnotationHub"
 RUN apt install -y libcurl4-openssl-dev libssl-dev libxml2-dev
 RUN Rscript requirements.R
+RUN chmod -R +766 "/usr/local/.ExperimentHub"
 
 # Install Python
 RUN apt install python3.10 python3-pip -y
