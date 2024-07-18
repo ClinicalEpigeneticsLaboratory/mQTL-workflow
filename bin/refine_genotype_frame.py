@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3.10
+#!/usr/bin/python3.10
 
 import sys
 
@@ -28,7 +28,7 @@ def preprocess_sample_sheet(sample_sheet_path: str, array_position_col: str, sam
     return sample_sheet
 
 def recode_sample_names(df: pd.DataFrame, sample_sheet: pd.DataFrame, array_position_col: str, sample_name_col: str) -> pd.DataFrame:
-    common = list(set(sample_sheet[array_position_col]).intersection(set(traw.columns)))
+    common = list(set(sample_sheet[array_position_col]).intersection(set(df.columns)))
     
     df = df[["SNP", "COUNTED", "ALT", *common]]
 
@@ -63,4 +63,4 @@ if __name__ == "__main__":
     traw = recode_sample_names(traw, sample_sheet, array_position_col, sample_name_col)
     traw = recode_notation(traw)
 
-    traw.to_parquet("traw_recoded.parquet")
+    traw.to_parquet("genotype_table.parquet")

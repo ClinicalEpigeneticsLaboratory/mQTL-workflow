@@ -1,26 +1,23 @@
-#!/usr/local/bin/R
-
-library("EpiDISH")
-library("arrow")
-library("dplyr")
+#!/usr/bin/Rscript
 
 args = commandArgs(trailingOnly=TRUE)
 
-mynorm_input = args[1]
-mynorm_output = args[2]
-cfp_output_dir = args[3]
+if (length(args)==0) {
+  stop("Two arguments <mynorm path> and <deconvolution method> must be supplied")
+} else {
+    mynorm_input = args[1]
+    deconvolution_method = args[2]
+}
 
-message("Input: ", mynorm_input, "\n",
-        "output mynorm: ", mynorm_output, "\n", 
-        "output cell proprotions estimation: ", cfp_output_dir,
-        "\n")
+library(EpiDISH)
+library(arrow)
+library(dplyr)
 
 # Function implementation
-modified_refBase <- function(beta, method="RPC"){
-  
+modified_refBase <- function(beta, method=method){
   data(centDHSbloodDMC.m)
   
-  frac.m <- epidish(beta, ref.m = centDHSbloodDMC.m, method = method)
+  frac.m <- epidish(beta, ref.m = centDHSbloodDMC.m, method = deconvolution_method)
   cellFrac <- frac.m$estF
   
   print(colMeans(cellFrac))
@@ -32,7 +29,7 @@ modified_refBase <- function(beta, method="RPC"){
   tmp.m[tmp.m <= 0] <- min(tmp.m[which(tmp.m > 0)])
   tmp.m[tmp.m >= 1] <- max(tmp.m[which(tmp.m < 1)])
   
-  frac.m2 <- epidish(tmp.m, ref.m = centDHSbloodDMC.m, method = method)
+  frac.m2 <- epidish(tmp.m, ref.m = centDHSbloodDMC.m, method = deconvolution_method)
   cellFrac2 <- frac.m2$estF
   
   return(list(CorrectedBeta = tmp.m, 
@@ -41,17 +38,18 @@ modified_refBase <- function(beta, method="RPC"){
 }
 
 mynorm <- read_parquet(mynorm_input) %>% as.data.frame()
-message("Loaded mynorm: ", dim(mynorm))
-
 rownames(mynorm) <- mynorm$CpG
 mynorm$CpG <- NULL
 
+mynorm <- na.omit(mynorm)
+print(head(mynorm))
+print(dim(mynorm))
 results <- modified_refBase(mynorm)
 
 corrected_mynorm <- as.data.frame(results$CorrectedBeta)
 corrected_mynorm$CpG <- row.names(corrected_mynorm)
 message("Exporting mynorm: ", dim(corrected_mynorm))
 
-write_parquet(corrected_mynorm, mynorm_output)
-write.csv(results$CellFractionBeforeCorrection, file.path(cfp_output_dir, "CF.csv"))
-write.csv(results$CellFractionAfterCorrection, file.path(cfp_output_dir, "CFc.csv"))
+write_parquet(corrected_mynorm, "mynorm_corrected.parquet")
+write.csv(results$CellFractionBeforeCorrection, "CF.csv")
+write.csv(results$CellFractionAfterCorrection, "CFc.csv")
