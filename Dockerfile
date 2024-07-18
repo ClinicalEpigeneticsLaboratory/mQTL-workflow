@@ -1,4 +1,4 @@
-FROM r-base:4.4.0
+FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install basic dependencies
@@ -6,6 +6,11 @@ RUN apt update && apt upgrade -y
 RUN apt install build-essential zlib1g-dev libncurses5-dev libgdbm-dev \
         libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev \
         libbz2-dev wget git curl -y
+
+# Install R
+RUN wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | gpg --dearmor -o /usr/share/keyrings/r-project.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/r-project.gpg] https://cloud.r-project.org/bin/linux/ubuntu jammy-cran40/" | tee -a /etc/apt/sources.list.d/r-project.list && \
+    apt update && apt install r-base r-base-dev -y
 
 # Download and install htslib-1.9
 RUN cd /usr/local/bin && \
@@ -43,26 +48,23 @@ RUN cd /usr/local/bin && git clone https://github.com/Ensembl/ensembl-vep.git &&
     perl INSTALL.pl --AUTO a
 ENV PATH="/usr/local/bin/ensembl-vep/:$PATH" 
 
-
-# # Set the working directory
+# Set the working directory
 WORKDIR /workspace
 
-# # Copy the codebase into the container.
+# Copy the codebase into the container.
 COPY requirements.R poetry.lock pyproject.toml info.sh .
 
 # Install R components
+# R is nightmare ...
+ENV EXPERIMENT_HUB_CACHE="/usr/local/.ExperimentHub"
+ENV ANNOTATION_HUB_CACHE="/usr/local/.AnnotationHub"
 RUN apt install -y libcurl4-openssl-dev libssl-dev libxml2-dev
 RUN Rscript requirements.R
 
 # Install Python
-RUN wget https://www.python.org/ftp/python/3.10.0/Python-3.10.0.tgz && \
-    tar -xvf Python-3.10.0.tgz && \
-    cd Python-3.10.0 && \
-    ./configure --enable-optimizations && \ 
-    make -j 4 && \
-    make altinstall
+RUN apt install python3.10 python3-pip -y
 
-# # Install requirements
+# Install requirements
 RUN python3.10 -m pip install poetry && python3.10 -m poetry export --without-hashes --format=requirements.txt > requirements.txt
 RUN python3.10 -m pip install -r requirements.txt
 
