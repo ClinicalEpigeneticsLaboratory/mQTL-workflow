@@ -26,6 +26,17 @@ To validate builds:
 
 ```
 docker run -it mqtl-image
+
+EXPECTED OUTPUT:
+
+Running container using following dependencies:
+Python: Python 3.10.0
+R: R version 4.4.1 (2024-06-14) -- "Race for Your Life"
+bgzip: bgzip (htslib) 1.9 Copyright (C) 2018 Genome Research Ltd.
+tabix: tabix (htslib) 1.9 Copyright (C) 2018 Genome Research Ltd.
+BCFtools: bcftools 1.9 Using htslib 1.9 Copyright (C) 2018 Genome Research Ltd. License Expat: The MIT/Expat license This is free software: you are free to change and redistribute it. There is NO WARRANTY, to the extent permitted by law.
+Illumina CLI: Array Analysis CLI 2.1.0
+VEP: 2024-07-17 17:55:11 - Read configuration from environment variables
 ```
 
 ### Workflow one: SNP Array Data Preprocessing
