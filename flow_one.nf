@@ -110,8 +110,6 @@ process indexVCF {
 }
 
 process mergeVCF {
-    publishDir params.results_dir, mode: 'copy', overwrite: true
-
     input:
     path vcf_files_dir
 
@@ -127,52 +125,51 @@ process mergeVCF {
 }
 
 process createGenotypeFrame {
+    publishDir params.results_dir, mode: 'copy', overwrite: true, pattern: 'genotype_table.traw'
     publishDir params.results_dir, mode: 'copy', overwrite: true, pattern: '*.frq'
-    publishDir params.results_dir, mode: 'copy', overwrite: true, pattern: '*.traw'
 
     input:
     path 'merged.bcf'
 
     output: 
-    path 'genotype.traw'
+    path 'genotype_table.traw', emit: frame
+    path '*.frq'
 
     script: 
     """
 
-    plink --bcf merged.bcf --freq --maf 0.05 --hwe 1e-50 --geno 0.1 --autosome --recode A-transpose -out genotype
+    plink --bcf merged.bcf --freq --maf 0.05 --hwe 1e-50 --geno 0.1 --autosome --recode A-transpose -out genotype_table
 
     """
 }
 
-process convertGenotypeFrame {
-    publishDir params.results_dir, mode: 'copy', overwrite: true, pattern: '*.parquet'
+process refineGenotypeFrame {
+    publishDir params.results_dir, mode: 'copy', overwrite: true, pattern: 'genotype_table.parquet'
 
     input:
-    path traw_file
+    path genotype_table
 
     output:
-    path 'traw_recoded.parquet'
+    path 'genotype_table.parquet'
 
     script:
     
     """
    
-    recode_traw.py $traw_file ${sample_sheet} ${params.array_position} ${params.sample_name}
+    refine_genotype_frame.py $genotype_table ${sample_sheet} ${params.array_position} ${params.sample_name}
     
-    """
-    
+    """   
 }
-
 
 workflow {
 
-    gsa_idats_dir_ch = prepareIDATs( idats )
-    gtc_dir_ch = callGenotypes( gsa_idats_dir_ch )
-    vcf_dir_ch = GtcToVcf( gtc_dir_ch )
+    gsa_idats_dir = prepareIDATs( idats )
+    gtc_dir = callGenotypes( gsa_idats_dir )
+    vcf_dir = GtcToVcf( gtc_dir )
     
-    indexed_vcf_dir_ch = indexVCF( vcf_dir_ch )
-    merged_bcf_ch = mergeVCF( indexed_vcf_dir_ch )
-    traw_ch = createGenotypeFrame( merged_bcf_ch )
+    indexed_vcf_dir = indexVCF( vcf_dir )
+    merged_bcf = mergeVCF( indexed_vcf_dir )
+    traw = createGenotypeFrame( merged_bcf )
 
-    convertGenotypeFrame( traw_ch )
+    refineGenotypeFrame( traw.frame )
 }
