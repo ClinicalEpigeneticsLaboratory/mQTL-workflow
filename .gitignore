@@ -23,3 +23,5 @@ resources/
 # Log
 *.log
 
+# Files
+*.parquet

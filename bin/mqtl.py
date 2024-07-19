@@ -1,3 +1,4 @@
+#!/usr/bin/python3.10
 
 import sys
 from functools import  partial
@@ -116,12 +117,12 @@ if __name__ == "__main__":
     if "SNP" in genotype_frame.columns:
         genotype_frame = genotype_frame.set_index("SNP")
     genotype_frame = genotype_frame.loc[genotype_frame.nunique(axis=1) > 1, :]
-
+    
     methylation_map = generate_methylation_map(methylation_manifest, methylation_frame)
     gsa_map = generate_gsa_map(gsa_manifest, genotype_frame)
 
     with Pool(int(nCPU)) as p:
-        results = p.map(analyse, gsa_map.keys())
+         results = p.map(analyse, gsa_map.keys())
 
     results = pd.concat(results)
     results = results[(results.FDR <= float(alpha)) & (results.slope.abs() >= float(slope))]
