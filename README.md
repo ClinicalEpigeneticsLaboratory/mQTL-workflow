@@ -36,7 +36,8 @@ bgzip: bgzip (htslib) 1.9 Copyright (C) 2018 Genome Research Ltd.
 tabix: tabix (htslib) 1.9 Copyright (C) 2018 Genome Research Ltd.
 BCFtools: bcftools 1.9 Using htslib 1.9 Copyright (C) 2018 Genome Research Ltd. License Expat: The MIT/Expat license This is free software: you are free to change and redistribute it. There is NO WARRANTY, to the extent permitted by law.
 Illumina CLI: Array Analysis CLI 2.1.0
-VEP: 2024-07-17 17:55:11 - Read configuration from environment variables
+
+[...]
 ```
 
 ### Workflow one: SNP Array Data Preprocessing
@@ -80,7 +81,7 @@ nextflow run flow_one.nf --bmp_manifest <path> --csv_manifest <path> --cluster_f
 Workflow config example:
 
 ```
-mQTL v1.0 Worklow one [SNPs arrays]
+mQTL 1.0v Worklow one [SNPs arrays]
 ==============
 
 Config:
@@ -110,8 +111,8 @@ This workflow will preprocess methylation array data from Illumina. It involves 
 ```
 0. Sanity check
 1. Sesame preprocessing: use the Sesame R package for preprocessing (prep code: QCDPB) the methylation data.
-2. Cell fraction correction: use linear models to adjust for cellular composition in the samples. [OPTIONAL]
-3. Exporting normalized or normalized AND adjusted for tissue composition beta-matrix frame (mynorm.parquet).
+3. Cell fraction correction: use linear models to adjust for cellular composition in the samples. [OPTIONAL]
+4. Exporting normalized or normalized AND adjusted for tissue composition beta-matrix frame (mynorm.parquet).
 ```
 
 Workflow command:
@@ -126,27 +127,33 @@ nextflow run flow_two.nf --CPUs <int> --methylation_idats_dir <path> --results_d
 - sample_sheet: sample sheet contianing at least info about `sample name` and `array position`
 - array_position: sample sheet column name containing information about array position (sentrix ID and sentrix position) e.g. `205723740073_R03C02`
 - sample_name: sample sheet column name containing sample name
+- correction: true or false for cell fraction correction
+- deconvolution method: methods from EpiDISH R package [default="RPC"]
+- collapse_prefix: true or false [default=true]
 
 Workflow config example:
 
 ```
-mQTL v1.0 Worklow two [Methylation arrays]
+mQTL 1.0v Worklow two [Methylation arrays]
 ==============
 
 Config:
 ==============
 Number of CPUs: 20
+Cell fraction correction: true
+Deconvolution method: RPC
+Collapse methylation readings to the cg prefix: true
 
 Input:
 ==============
 Methylation idats: EPIC/
 Sample sheet: sample_sheet.csv
-Array position column: SentrixInfo
+Array position column: Sentrix_Info
 Sample name column: Sample_Name
 
 Output:
 ==============
-results directory: results/
+results directory: results
 ```
 
 ### Workflow three: mQTL Identification
