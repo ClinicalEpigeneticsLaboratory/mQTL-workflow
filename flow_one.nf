@@ -15,7 +15,7 @@ params.array_position = 'ArrayPicker'
 params.sample_name = 'Sample_Name'
 
 log.info """\
-            mQTL v1.0 Worklow one [SNPs arrays]
+            mQTL ${version} Worklow one [SNPs arrays]
             ==============
             
             Config:

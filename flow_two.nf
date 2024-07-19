@@ -9,12 +9,13 @@ params.array_position = 'Sentrix_Info'
 params.sample_name = 'Sample_Name'
 
 // CLI default params
+params.CPUs = 10
 params.correction = true
 params.deconvolution_method = 'RPC'
-
+params.collapse_prefix = true
 
 log.info """\
-            mQTL v1.0 Worklow two [Methylation arrays]
+            mQTL $version Worklow two [Methylation arrays]
             ==============
             
             Config:
@@ -22,6 +23,7 @@ log.info """\
             Number of CPUs: ${params.CPUs}
             Cell fraction correction: ${params.correction}
             Deconvolution method: ${params.deconvolution_method}
+            Collapse methylation readings to the cg prefix: ${params.collapse_prefix}
 
             Input:
             ==============
@@ -65,7 +67,7 @@ process processIDATs {
     script:
     """
     
-    sesame.R $idats ${params.CPUs}
+    sesame.R $idats ${params.CPUs} ${params.collapse_prefix}
 
     """
 }
