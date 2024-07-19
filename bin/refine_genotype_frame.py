@@ -50,9 +50,13 @@ if __name__ == "__main__":
     traw_path, sample_sheet_path, array_position_col, sample_name_col = sys.argv[1:]
     
     print(f"""
-    Processing traw file: {traw_path}
+    INPUT:
     =================================
+    Processing traw file: {traw_path}
     Sample sheet: {sample_sheet_path}
+
+    PARAMS:
+    =================================
     Array position column: {array_position_col}
     Sample name column: {sample_name_col}
     """)
@@ -63,4 +67,6 @@ if __name__ == "__main__":
     traw = recode_sample_names(traw, sample_sheet, array_position_col, sample_name_col)
     traw = recode_notation(traw)
 
+    traw = traw.drop(["COUNTED", "ALT"], axis=1)
+    traw = traw.loc[traw.nunique(axis=1) > 1, :]
     traw.to_parquet("genotype_table.parquet")

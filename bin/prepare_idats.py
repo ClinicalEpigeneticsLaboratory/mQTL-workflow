@@ -44,9 +44,13 @@ if __name__ == "__main__":
     input_dir, sample_sheet_path, array_position_col, dest = sys.argv[1:]
     
     print(f"""
-    Processing IDATs dir: {input_dir}
+    INPUT:
     =================================
+    Processing IDATs dir: {input_dir}
     Sample sheet: {sample_sheet_path}
+
+    PARAMS:
+    =================================
     Array position column: {array_position_col}
     Destination directory: {dest}
     """)

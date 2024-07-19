@@ -7,6 +7,7 @@ if (length(args)==0) {
 } else {
   data_path = args[1]
   n_cpus = args[2]
+  collapse_prefix = args[3]
 }
 
 library(BiocParallel)
@@ -15,9 +16,15 @@ library(arrow)
 
 message("Running: ", data_path)
 message("n CPUs: ", n_cpus)
+message("Collapse prefix: ", collapse_prefix)
 message("Loading idats")
 
-betas <- openSesame(data_path, prep="QCDPB", BPPARAM = MulticoreParam(n_cpus))
+if (collapse_prefix == "true"){
+    betas <- openSesame(data_path, prep="QCDPB", BPPARAM = MulticoreParam(n_cpus), collapseToPfx = TRUE, collapseMethod = "mean")
+} else {
+    betas <- openSesame(data_path, prep="QCDPB", BPPARAM = MulticoreParam(n_cpus), collapseToPfx = FALSE)
+}
+
 betas = betas %>% as.data.frame
 betas$CpG <- rownames(betas)
 
