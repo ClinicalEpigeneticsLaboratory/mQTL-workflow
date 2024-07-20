@@ -66,7 +66,9 @@ if __name__ == "__main__":
     
     traw = recode_sample_names(traw, sample_sheet, array_position_col, sample_name_col)
     traw = recode_notation(traw)
-
+    traw = traw.set_index("SNP")
+    
     traw = traw.drop(["COUNTED", "ALT"], axis=1)
-    traw = traw.loc[traw.nunique(axis=1) > 1, :]
+    traw = traw.loc[traw.nunique(axis=1) > 1, ]
+
     traw.to_parquet("genotype_table.parquet")

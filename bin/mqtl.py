@@ -91,7 +91,7 @@ def analyse(chr_):
 
 
 if __name__ == "__main__":
-    genotype_frame, methylation_frame, gsa_manifest, methylation_manifest, distance, alpha, slope, nCPU = sys.argv[1:]
+    genotype_frame, methylation_frame, gsa_manifest, methylation_manifest, distance, nCPU = sys.argv[1:]
     
     print(f"""
     INPUT:
@@ -103,20 +103,17 @@ if __name__ == "__main__":
 
     OPTIONS:
     =================================
-    Statistical significance level [alpha]: {alpha}
     Distance threshold [bp]: {distance}
-    Absolute slope threshold: {slope}
     CPUs: {nCPU}
     """)
     
     methylation_frame = pd.read_parquet(methylation_frame)
     if "CpG" in methylation_frame.columns:
         methylation_frame = methylation_frame.set_index("CpG")
-
-    genotype_frame = pd.read_parquet(genotype_frame)    
+    
+    genotype_frame = pd.read_parquet(genotype_frame)
     if "SNP" in genotype_frame.columns:
         genotype_frame = genotype_frame.set_index("SNP")
-    genotype_frame = genotype_frame.loc[genotype_frame.nunique(axis=1) > 1, :]
     
     methylation_map = generate_methylation_map(methylation_manifest, methylation_frame)
     gsa_map = generate_gsa_map(gsa_manifest, genotype_frame)
@@ -125,5 +122,4 @@ if __name__ == "__main__":
          results = p.map(analyse, gsa_map.keys())
 
     results = pd.concat(results)
-    results = results[(results.FDR <= float(alpha)) & (results.slope.abs() >= float(slope))]
     results.to_parquet("mQTL.parquet")
