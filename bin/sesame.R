@@ -6,7 +6,7 @@ if (length(args)==0) {
   stop("Two arguments <idats dir path> and <n CPUs> must be supplied")
 } else {
   data_path = args[1]
-  n_cpus = args[2]
+  n_cpus = as.numeric(args[2])
   collapse_prefix = args[3]
 }
 
