@@ -51,32 +51,31 @@ The first workflow preprocesses SNP array data from Illumina microarrays. It inv
 4. Filtering and formatting:
     1. Use PLINK to filter the merged BCF file.
     2. Apply filters: minor allele frequency (--maf 0.05), Hardy-Weinberg equilibrium (--hwe 1e-50), genotype missingness (--geno 0.1), and autosome restriction.
-    3. Recode to a transposed format.
-5. Exporting results files (merged.bcf, *.frq, *.traw as well as recoded traw file - *.parquet).
+    3. Extract only bi-allelic loci.
+    4. Recode to a transposed format.
+5. Exporting results files (*.bcf, *.frq, *.traw as well as recoded traw file - *.parquet).
 ```
 
-Workflow command:
+Workflow basic command:
 
 ```
-nextflow run flow_one.nf --bmp_manifest <path> --csv_manifest <path> --cluster_file <path> --reference_fa <path> --CPUs <int> --gsa_idats_dir <path> --results_dir <path> --sample_sheet <path> --array_position <str> --sample_name <str>
+nextflow run flow_one.nf --reference_fa <path> --bmp_manifest <path> --csv_manifest <path> --cluster_file <path> --gsa_idats_dir <path> --sample_sheet <path> --array_position <str> --sample_name <str> --results_dir <path>
 ```
-
+- reference_fa: path to reference genome
 - bmp_manifest: path to GSA array specific BMP manifest file
 - csv_manifest: path to GSA array specific CSV manifest file
 - cluster_file: path to GSA array specific cluster file
-- reference_fa: path to reference genome
-- CPUs: number of CPUs to use, should be positive integer 
-- gsa_idats_dir: directory comprising GSA idats to analyse
-- results_dir: results directory
+- gsa_idats_dir: directory comprising GSA idats
 - sample_sheet: sample sheet contianing at least info about `sample name` and `array position`
 - array_position: sample sheet column name containing information about array position (sentrix ID and sentrix position) e.g. `205723740073_R03C02`
 - sample_name: sample sheet column name containing sample name
+- results_dir: results directory
 
-**IMPORTANT NOTE:** Only IDATs common between `gsa_idats_dir/` and  `sample_sheet` are going to be analysed!
 
-**IMPORTANT NOTE:** BMP manifest, CSV manifest as well as cluster file are product specific files therefore should be downloaded from Illumina Product Files page e.g. [GSA v3.0](https://emea.support.illumina.com/downloads/infinium-global-screening-array-v3-0-product-files.html)
-
-**IMPORTANT NOTE:** Reference genome should be downloaded from [iGenomes](https://emea.support.illumina.com/sequencing/sequencing_software/igenome.html)
+**IMPORTANT NOTES:** 
+- Only IDATs common between `gsa_idats_dir/` and  `sample_sheet` are going to be analysed!
+- BMP manifest, CSV manifest as well as cluster file are product specific files therefore should be downloaded from Illumina Product Files page e.g. [GSA v3.0](https://emea.support.illumina.com/downloads/infinium-global-screening-array-v3-0-product-files.html)
+- Reference genome along with indexes should be downloaded from [Illumina](https://emea.support.illumina.com/downloads/genome-fasta-files.html)
 
 Workflow config example:
 
@@ -86,22 +85,28 @@ mQTL 1.0v Worklow one [SNPs arrays]
 
 Config:
 ==============
-Reference genome: resources/GRCh37_genome.fa
-BMP manifest: resources/GSA-24v3-0_A1.bpm
-CSV manifest: resources/GSA-24v3-0_A1.csv
-Cluster file: resources/GSA-24v3-0_A1_ClusterFile.egt
-Number of CPUs: 20
+Reference genome [--reference_fa <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/resources/GRCh37_genome.fa
+BMP manifest [--bmp_manifest <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/resources/GSA-24v3-0_A1.bpm
+CSV manifest [--csv_manifest <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/resources/GSA-24v3-0_A1.csv
+Cluster file [--cluster_file <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/resources/GSA-24v3-0_A1_ClusterFile.egt
+Number of CPUs [--CPUs <int>]: 10 [default: 10]
+
+PLINK params:
+==============
+MAF [--MAF <float>]: 0.01 [default: 0.01]
+HWE [--HWE <float>]: 1e-50 [default: 1e-50]
+GENO [--GENO <float>]: 0.1 [default: 0.1]
 
 Input:
 ==============
-GSA idats: GSA/
-Sample sheet: sample_sheet.csv
-Array position column: ArrayPicker
-Sample name column: Sample_Name
+GSA idats [--gsa_idats_dir <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/GSA
+Sample sheet [--sample_sheet <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/sample_sheet.csv
+Array position column [--array_position <str>]: ArrayPicker
+Sample name column [--sample_name <str>]: Sample_Name
 
 Output:
 ==============
-results directory: results/
+results directory [--results_dir <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/results
 ```
 
 ### Workflow two: Methylation Array Data Preprocessing
@@ -113,23 +118,21 @@ This workflow will preprocess methylation array data from Illumina. It involves 
 1. Sesame preprocessing: use the Sesame R package for preprocessing (prep code: QCDPB) the methylation data.
 3. Cell fraction correction: use linear models to adjust for cellular composition in the samples. [OPTIONAL]
 4. Exporting normalized or normalized AND adjusted for tissue composition beta-matrix frame (mynorm.parquet).
-```
-
-Workflow command:
+5. If cell fraction correction has been performed workflow will also export estimated cell proportions before (CF.csv) and after (CFc.csv) data adjustment.
 
 ```
-nextflow run flow_two.nf --CPUs <int> --methylation_idats_dir <path> --results_dir <path> --sample_sheet <path> --array_position <str> --sample_name <str>
+
+Workflow basic command:
+
+```
+nextflow run flow_two.nf --methylation_idats_dir <path> --sample_sheet <path> --array_position <str> --sample_name <str> --results_dir <path>
 ```
 
-- CPUs: number of CPUs to use, should be positive integer 
 - methylation_idats_dir: directory comprising EPIC2/EPIC/450K idats to analyse
-- results_dir: results directory
 - sample_sheet: sample sheet contianing at least info about `sample name` and `array position`
 - array_position: sample sheet column name containing information about array position (sentrix ID and sentrix position) e.g. `205723740073_R03C02`
 - sample_name: sample sheet column name containing sample name
-- correction: true or false for cell fraction correction
-- deconvolution method: methods from EpiDISH R package [default="RPC"]
-- collapse_prefix: true or false [default=true]
+- results_dir: results directory [the same as in flow_one]
 
 Workflow config example:
 
@@ -139,32 +142,75 @@ mQTL 1.0v Worklow two [Methylation arrays]
 
 Config:
 ==============
-Number of CPUs: 20
-Cell fraction correction: true
-Deconvolution method: RPC
-Collapse methylation readings to the cg prefix: true
+Number of CPUs [--CPUs <int>]: 10 [default: 10]
+Cell fraction correction [--correction <boolean: true/false>]: true [default: false]
+Deconvolution method [--deconvolution_method <str: CP/RPC/CBS>]: RPC [default: RPC]
+Collapse methylation readings to the cg prefix [--collapse_prefix <boolean: true/false>]: true [default: true]
 
 Input:
 ==============
-Methylation idats: EPIC/
-Sample sheet: sample_sheet.csv
-Array position column: Sentrix_Info
-Sample name column: Sample_Name
+Methylation idats [--methylation_idats_dir <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/EPIC
+Sample sheet [--sample_sheet <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/sample_sheet.csv
+Array position column [--array_position <str>]: Sentrix_Info
+Sample name column [--sample_name <str>]: Sample_Name
 
 Output:
 ==============
-results directory: results
+results directory [--results_dir <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/results
 ```
 
 ### Workflow three: mQTL Identification
-Note: This workflow is not yet implemented.
-
-This workflow will analyze data from flow_one and flow_two to identify mQTLs. Planned steps include:
+This workflow will analyze data from flow_one and flow_two to identify mQTLs. It involves the following steps:
 
 ```
 1. mQTL analysis: Integrate genetic and methylation data to identify mQTLs.
-2. Clumping: Perform clumping to group SNPs based on linkage disequilibrium.
-3. Enrichment analysis: Conduct enrichment analysis to interpret the biological significance of the identified mQTLs. [VEP]
+2. Filtering: extracting significant mQTLs based on provided criteria.
+3. Annotating: mQTL annotations using VEP webserver.
+4. Clumping: Perform clumping to group SNPs based on linkage disequilibrium.
+```
+
+Workflow basic command:
+
+```
+nextflow run flow_three.nf --csv_gsa_manifest <path> --csv_methylation_manifest <path> --results_dir <path>
+```
+
+- csv_gsa_manifest: GSA manifest file
+- csv_methylation_manifest: 450K/EPIC/EPIV2 manifest file 
+- results_dir: results directory [the same as in flow_one and flow_two]
+
+Workflow config example:
+```
+mQTL 1.0v Worklow three [mQTL]
+==============
+
+Config:
+==============
+GSA manifest [--csv_gsa_manifest <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/resources/GSA-24v3-0_A1.csv
+Methylation manifest [--csv_methylation_manifest <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/resources/infinium-methylationepic-v-1-0-b5-manifest-file.csv
+Genome assembly [--genome_assembly <str>]: GRCh37 [default: GRCh37]
+VEP annotations [--vep_annotations <boolean: true/false>]: true [default: false]
+Alpha [--alpha <float>]: 0.05 [default: 0.05]
+Slope [--slope <float>]: 0.05 [default: 0.05]
+Distance [--distance <int>]: 50000 [default: 50000]
+Number of CPUs [--CPUs <int>]: 10 [default: 10]
+
+PLINK config:
+==============
+P1: [--clump_p1 <float>]: 0.0001 [default: 0.0001]
+P2: [--clump_p2 <float>]: 0.01 [default: 0.01]
+R1: [--clump_r2 <float>]: 0.50 [default: 0.5]
+KB: [--clump_kb <int>]: 250 [default: 250]
+
+Input:
+==============
+Methylation frame: /home/jupyter-jan_binkowski/projects/mQTL-workflow/results/flow_two/mynorm_corrected.parquet
+Genotype table: /home/jupyter-jan_binkowski/projects/mQTL-workflow/results/flow_one/genotype_table.parquet
+BCF file: /home/jupyter-jan_binkowski/projects/mQTL-workflow/results/flow_one/filtered_merged.bcf
+
+Output:
+==============
+results directory: /home/jupyter-jan_binkowski/projects/mQTL-workflow/results
 ```
 
 ### Contributing
