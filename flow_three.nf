@@ -29,8 +29,8 @@ log.info """\
             ==============
             GSA manifest [--csv_gsa_manifest <path>]: ${params.csv_gsa_manifest}
             Methylation manifest [--csv_methylation_manifest <path>]: ${params.csv_methylation_manifest}
-            Genome assembly [--genome_assembly <str>]: ${params.genome_assembly} [default: GRCh37]
-            VEP annotations [--vep_annotations <boolean: true/false>]: ${params.vep_annotations} [default: true]
+            Genome assembly [--genome_assembly <str>]: ${params.genome_assembly} [default: GRCh37 (important if VEP is ON)]
+            VEP annotations [--vep_annotations <boolean: true/false>]: ${params.vep_annotations} [default: false (very slow)]
             Alpha [--alpha <float>]: ${params.alpha} [default: 0.05]
             Slope [--slope <float>]: ${params.slope} [default: 0.05]
             Distance [--distance <int>]: ${params.distance} [default: 50000]
