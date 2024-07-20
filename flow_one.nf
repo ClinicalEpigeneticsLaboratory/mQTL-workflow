@@ -1,16 +1,15 @@
 #!/usr/bin/env nextflow
 
 // Workflow Params
-// CLI params - array specific options
-params.bmp_manifest = 'resources/GSA-24v3-0_A1.bpm'
-params.csv_manifest = 'resources/GSA-24v3-0_A1.csv'
-params.cluster_file = 'resources/GSA-24v3-0_A1_ClusterFile.egt'
-params.reference_fa = 'resources/GRCh37_genome.fa'
+params.bmp_manifest = file('resources/GSA-24v3-0_A1.bpm')
+params.csv_manifest = file('resources/GSA-24v3-0_A1.csv')
+params.cluster_file = file('resources/GSA-24v3-0_A1_ClusterFile.egt')
+params.reference_fa = file('resources/GRCh37_genome.fa')
 
-// CLI params - experiment specific options
-params.gsa_idats_dir = 'GSA/'
-params.results_dir = 'results/'
-params.sample_sheet = 'sample_sheet.csv'
+params.sample_sheet = file('sample_sheet.csv')
+params.gsa_idats_dir = file('GSA/')
+params.results_dir = file('results/')
+
 params.array_position = 'ArrayPicker'
 params.sample_name = 'Sample_Name'
 
@@ -20,44 +19,69 @@ log.info """\
             
             Config:
             ==============
-            Reference genome: ${params.reference_fa}
-            BMP manifest: ${params.bmp_manifest}
-            CSV manifest: ${params.csv_manifest}
-            Cluster file: ${params.cluster_file}
-            Number of CPUs: ${params.CPUs}
+            Reference genome [--reference_fa <path>]: ${params.reference_fa}
+            BMP manifest [--bmp_manifest <path>]: ${params.bmp_manifest}
+            CSV manifest [--csv_manifest <path>]: ${params.csv_manifest}
+            Cluster file [--cluster_file <path>]: ${params.cluster_file}
+            Number of CPUs [--CPUs <int>]: ${params.CPUs} [default: 10]
+
+            PLINK params:
+            ==============
+            MAF [--MAF <float>]: ${params.MAF} [default: 0.01]
+            HWE [--HWE <float>]: ${params.HWE} [default: 1e-50]
+            GENO [--GENO <float>]: ${params.GENO} [default: 0.1]
 
             Input:
             ==============
-            GSA idats: ${params.gsa_idats_dir}
-            Sample sheet: ${params.sample_sheet}
-            Array position column: ${params.array_position}
-            Sample name column: ${params.sample_name}
+            GSA idats [--gsa_idats_dir <path>]: ${params.gsa_idats_dir}
+            Sample sheet [--sample_sheet <path>]: ${params.sample_sheet}
+            Array position column [--array_position <str>]: ${params.array_position}
+            Sample name column [--sample_name <str>]: ${params.sample_name}
 
             Output:
             ==============
-            results directory: ${params.results_dir}
+            results directory [--results_dir <path>]: ${params.results_dir}
 
 """.stripIndent()
 
-idats = file( params.gsa_idats_dir, checkIfExists: true )
-sample_sheet = file( params.sample_sheet, checkIfExists: true )
-bmp_manifest = file( params.bmp_manifest, checkIfExists: true )
-csv_manifest = file( params.csv_manifest, checkIfExists: true )
-cluster_file = file( params.cluster_file, checkIfExists: true )
-reference_fa = file( params.reference_fa, checkIfExists: true )
+process validateParams {
+    script:
+    """
+    #!/usr/bin/python3
 
+    import os
+    import multiprocessing
+    import pandas as pd 
+
+    # --CPUs flag check
+    cpus_available = multiprocessing.cpu_count() - 1
+    assert ${params.CPUs} <= cpus_available, f"Exceeded number of available cpus --> {${params.CPUs}} / {cpus_available}" 
+
+    # Files flags check
+    files = ["${params.reference_fa}", "${params.csv_manifest}", "${params.cluster_file}", "${params.reference_fa}", "${params.sample_sheet}"]
+    for file in files:
+        assert os.path.exists(file), f"File does not exists {file}"
+
+    # --array_position and --sample_name flags check
+    sample_sheet_fields = pd.read_csv("${params.sample_sheet}").columns
+    assert "${params.array_position}" in sample_sheet_fields, f"${params.array_position} not present in sample sheet columns: {sample_sheet_fields}"
+    assert "${params.sample_name}" in sample_sheet_fields, f"${params.sample_name} not present in sample sheet columns: {sample_sheet_fields}"
+
+    """
+
+}
 
 process prepareIDATs {
     input:
     path gsa
 
     output: 
-    path prepared_idats_directory, type: 'dir'
+    path 'prepared_idats_directory', type: 'dir'
     
     script:
     """
     
-    prepare_idats.py $gsa ${sample_sheet} ${params.array_position} prepared_idats_directory
+    prepare_idats.py $gsa ${params.sample_sheet} ${params.array_position} prepared_idats_directory
 
     """
 }
@@ -67,29 +91,28 @@ process callGenotypes {
     path idats_dir
 
     output:
-    path gtc_files_dir, type: 'dir'
+    path 'gtc_files_dir', type: 'dir'
 
     script:
     """
-    array-analysis-cli genotype call --bpm-manifest ${bmp_manifest} --cluster-file ${cluster_file} --idat-folder $idats_dir --num-threads ${params.CPUs} --output-folder gtc_files_dir
+    array-analysis-cli genotype call --bpm-manifest ${params.bmp_manifest} --cluster-file ${params.cluster_file} --idat-folder $idats_dir --num-threads ${params.CPUs} --output-folder gtc_files_dir
 
     """
 }
-
 
 process GtcToVcf {
     input:
     path gtc_dir
 
     output:
-    path vcf_files_dir, type: 'dir'
+    path 'vcf_files_dir', type: 'dir'
 
     script:
     """
 
-    array-analysis-cli genotype gtc-to-vcf --csv-manifest ${csv_manifest} --bpm-manifest ${bmp_manifest} --gtc-folder $gtc_dir --genome-fasta-file ${reference_fa} --output-folder vcf_files_dir
+    array-analysis-cli genotype gtc-to-vcf --csv-manifest ${params.csv_manifest} --bpm-manifest ${params.bmp_manifest} --gtc-folder $gtc_dir --genome-fasta-file ${params.reference_fa} --output-folder vcf_files_dir
 
-"""
+    """
 }
 
 process indexVCF {
@@ -99,7 +122,7 @@ process indexVCF {
     output:
     path vcf_files_dir, type: 'dir'
 
-    script: 
+    script:
     """
     cd $vcf_files_dir
 
@@ -124,12 +147,29 @@ process mergeVCF {
     """
 }
 
-process createGenotypeFrame {
-    publishDir params.results_dir, mode: 'copy', overwrite: true, pattern: 'genotype_table.traw'
-    publishDir params.results_dir, mode: 'copy', overwrite: true, pattern: '*.frq'
+process filterBCF {
+    publishDir "$params.results_dir/flow_one", mode: 'copy', overwrite: true, pattern: 'filtered_merged.bcf'
 
     input:
-    path 'merged.bcf'
+    path bcf_file
+
+    output:
+    path 'filtered_merged.bcf'
+
+    script: 
+    """
+    
+    bcftools view -m 2 -M 2 $bcf_file -O b -o filtered_merged.bcf
+
+    """
+}
+
+process createGenotypeFrame {
+    publishDir "$params.results_dir/flow_one", mode: 'copy', overwrite: true, pattern: 'genotype_table.traw'
+    publishDir "$params.results_dir/flow_one", mode: 'copy', overwrite: true, pattern: '*.frq'
+
+    input:
+    path filtered_merged_bcf_file
 
     output: 
     path 'genotype_table.traw', emit: frame
@@ -138,13 +178,13 @@ process createGenotypeFrame {
     script: 
     """
 
-    plink --bcf merged.bcf --freq --maf 0.05 --hwe 1e-50 --geno 0.1 --autosome --recode A-transpose -out genotype_table
+    plink --bcf $filtered_merged_bcf_file --freq --maf ${params.MAF} --hwe ${params.HWE} --geno ${params.GENO} --autosome --recode A-transpose -out genotype_table
 
     """
 }
 
 process refineGenotypeFrame {
-    publishDir params.results_dir, mode: 'copy', overwrite: true, pattern: 'genotype_table.parquet'
+    publishDir "$params.results_dir/flow_one", mode: 'copy', overwrite: true, pattern: 'genotype_table.parquet'
 
     input:
     path genotype_table
@@ -156,20 +196,22 @@ process refineGenotypeFrame {
     
     """
    
-    refine_genotype_frame.py $genotype_table ${sample_sheet} ${params.array_position} ${params.sample_name}
+    refine_genotype_frame.py $genotype_table ${params.sample_sheet} ${params.array_position} ${params.sample_name}
     
     """   
 }
 
 workflow {
+    validateParams()
 
-    gsa_idats_dir = prepareIDATs( idats )
-    gtc_dir = callGenotypes( gsa_idats_dir )
+    prepared_idats = prepareIDATs( params.gsa_idats_dir )
+    gtc_dir = callGenotypes( prepared_idats )
     vcf_dir = GtcToVcf( gtc_dir )
     
     indexed_vcf_dir = indexVCF( vcf_dir )
     merged_bcf = mergeVCF( indexed_vcf_dir )
-    traw = createGenotypeFrame( merged_bcf )
+    filtered_bcf = filterBCF( merged_bcf )
+    genotypes = createGenotypeFrame( filtered_bcf )
 
-    refineGenotypeFrame( traw.frame )
+    refineGenotypeFrame( genotypes.frame )
 }
