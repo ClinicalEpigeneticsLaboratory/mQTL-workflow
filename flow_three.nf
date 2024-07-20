@@ -135,7 +135,7 @@ process anotateSNPs {
     path rs_list 
 
     output:
-    path report
+    path 'report*'
 
     script:
     """
