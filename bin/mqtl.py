@@ -97,7 +97,7 @@ def analyse(chr_):
                     "rs POS": rs_pos,
                     "cpg": cpg,
                     "cpg POS": cpg_pos,
-                    "slope": slope,
+                    "slope": abs(slope),
                     "R2": r**2,
                     "p-value": pval,
                 }
