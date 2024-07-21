@@ -61,7 +61,7 @@ Workflow basic command:
 ```
 nextflow run flow_one.nf --reference_fa <path> --bmp_manifest <path> --csv_manifest <path> --cluster_file <path> --gsa_idats_dir <path> --sample_sheet <path> --array_position <str> --sample_name <str> --results_dir <path>
 ```
-- reference_fa: path to reference genome
+- reference_fa: path to directory comprising reference genom [*.fa] as well as genome index [*.fai]
 - bmp_manifest: path to GSA array specific BMP manifest file
 - csv_manifest: path to GSA array specific CSV manifest file
 - cluster_file: path to GSA array specific cluster file
@@ -85,10 +85,10 @@ mQTL 1.0v Worklow one [SNPs arrays]
 
 Config:
 ==============
-Reference genome [--reference_fa <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/resources/GRCh37_genome.fa
-BMP manifest [--bmp_manifest <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/resources/GSA-24v3-0_A1.bpm
-CSV manifest [--csv_manifest <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/resources/GSA-24v3-0_A1.csv
-Cluster file [--cluster_file <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/resources/GSA-24v3-0_A1_ClusterFile.egt
+Ref. genome directory [should include *.fa and *.fai files] [--reference_fa <path>]: ../test/resources/
+BMP manifest [--bmp_manifest <path>]: ../test/resources/GSA-24v3-0_A1.bpm
+CSV manifest [--csv_manifest <path>]: ../test/resources/GSA-24v3-0_A1.csv
+Cluster file [--cluster_file <path>]: ../test/resources/GSA-24v3-0_A1_ClusterFile.egt
 Number of CPUs [--CPUs <int>]: 10 [default: 10]
 
 PLINK params:
@@ -99,15 +99,20 @@ GENO [--GENO <float>]: 0.1 [default: 0.1]
 
 Input:
 ==============
-GSA idats [--gsa_idats_dir <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/GSA
-Sample sheet [--sample_sheet <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/sample_sheet.csv
+GSA idats [--gsa_idats_dir <path>]: ../test/GSA/
+Sample sheet [--sample_sheet <path>]: ../test/sample_sheet.csv
 Array position column [--array_position <str>]: ArrayPicker
 Sample name column [--sample_name <str>]: Sample_Name
 
 Output:
 ==============
-results directory [--results_dir <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/results
+results directory [--results_dir <path>]: ../test/results
 ```
+
+Workflow output is placed in <results_dir/flow_one> directory, and includes:
+- `filtered_merged.bcf` - merged VCF files, filtered for biallelic loci
+- `genotype_table.traw` - BCF file converted to PLINK traw format
+- `genotype_table.parquet` - final tabular file comprising information about genotype per sample
 
 ### Workflow two: Methylation Array Data Preprocessing
 
@@ -142,22 +147,29 @@ mQTL 1.0v Worklow two [Methylation arrays]
 
 Config:
 ==============
-Number of CPUs [--CPUs <int>]: 10 [default: 10]
 Cell fraction correction [--correction <boolean: true/false>]: true [default: false]
 Deconvolution method [--deconvolution_method <str: CP/RPC/CBS>]: RPC [default: RPC]
 Collapse methylation readings to the cg prefix [--collapse_prefix <boolean: true/false>]: true [default: true]
+Number of CPUs [--CPUs <int>]: 10 [default: 10]
 
 Input:
 ==============
-Methylation idats [--methylation_idats_dir <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/EPIC
-Sample sheet [--sample_sheet <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/sample_sheet.csv
+Methylation idats [--methylation_idats_dir <path>]: ../test/EPIC/
+Sample sheet [--sample_sheet <path>]: ../test/sample_sheet.csv
 Array position column [--array_position <str>]: Sentrix_Info
 Sample name column [--sample_name <str>]: Sample_Name
 
 Output:
 ==============
-results directory [--results_dir <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/results
+results directory [--results_dir <path>]: ../test/results/
 ```
+
+Workflow output is placed in <results_dir/flow_two> directory, and includes:
+- `mynorm.parquet` - normalized beta-matrix
+- `mynorm_corrected.parquet` - normalized beta-matrix corrected for tissue composition (applicable only for blood samples, only if --correction true)
+- `CF.csv` - estimated cellular fractions before correction (only if --correction true)
+- `CFc.csv`- estimated cellular fractions after correction (only if --correction true)
+
 
 ### Workflow three: mQTL Identification
 This workflow will analyze data from flow_one and flow_two to identify mQTLs. It involves the following steps:
@@ -186,14 +198,14 @@ mQTL 1.0v Worklow three [mQTL]
 
 Config:
 ==============
-GSA manifest [--csv_gsa_manifest <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/resources/GSA-24v3-0_A1.csv
-Methylation manifest [--csv_methylation_manifest <path>]: /home/jupyter-jan_binkowski/projects/mQTL-workflow/resources/infinium-methylationepic-v-1-0-b5-manifest-file.csv
-Genome assembly [--genome_assembly <str>]: GRCh37 [default: GRCh37]
-VEP annotations [--vep_annotations <boolean: true/false>]: true [default: false]
+GSA manifest [--csv_gsa_manifest <path>]: ../test/resources/GSA-24v3-0_A1.csv
+Methylation manifest [--csv_methylation_manifest <path>]: ../test/resources/infinium-methylationepic-v-1-0-b5-manifest-file.csv
+Genome assembly [--genome_assembly <str>]: GRCh37 [default: GRCh37 (important if VEP is ON)]
+VEP annotations [--vep_annotations <boolean: true/false>]: false [default: false (very slow)]
 Alpha [--alpha <float>]: 0.05 [default: 0.05]
 Slope [--slope <float>]: 0.05 [default: 0.05]
 Distance [--distance <int>]: 50000 [default: 50000]
-Number of CPUs [--CPUs <int>]: 10 [default: 10]
+Number of CPUs [--CPUs <int>]: 20 [default: 10]
 
 PLINK config:
 ==============
@@ -204,15 +216,21 @@ KB: [--clump_kb <int>]: 250 [default: 250]
 
 Input:
 ==============
-Methylation frame: /home/jupyter-jan_binkowski/projects/mQTL-workflow/results/flow_two/mynorm_corrected.parquet
-Genotype table: /home/jupyter-jan_binkowski/projects/mQTL-workflow/results/flow_one/genotype_table.parquet
-BCF file: /home/jupyter-jan_binkowski/projects/mQTL-workflow/results/flow_one/filtered_merged.bcf
+Results from flow_one and flow_two are expected to be in [--results_dir <path>]: ../test/results/
 
 Output:
 ==============
-results directory: /home/jupyter-jan_binkowski/projects/mQTL-workflow/results
+results directory [--results_dir <path>]: ../test/results/
 ```
 
+Workflow output is placed in <results_dir/flow_three> directory, and includes:
+- 'mQTL.parquet' - tabular file comprising mQTL stats
+- 'filtered_mQTL.parquet' - tabular file comprising filtered mQTLs based on --alpha and --slope parameters 
+- 'cpg_list.txt' and 'rs_list.txt' - lists of CpGs as well as rsIDs for all significant mQTLs
+- 'cpg_pval.txt' and 'rs_pval.txt' - lists of all assesed CpGs/SNPs along with FDR corrected p-value (Benjamini/Yekutieli)
+- 'report' and 'report_summary.html' - VEP output generated for 'rs_list.txt'
+- 'plink.clumped' - clumping results generated based on 'rs_pval.txt' and 'filtered_merged.bcf'
+  
 ### Contributing
 Contributions to the project are welcome. Please fork the repository, make your changes, and submit a pull request.
 
