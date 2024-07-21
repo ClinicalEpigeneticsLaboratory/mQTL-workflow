@@ -133,11 +133,11 @@ Workflow basic command:
 nextflow run flow_two.nf --methylation_idats_dir <path> --sample_sheet <path> --array_position <str> --sample_name <str> --results_dir <path>
 ```
 
-- methylation_idats_dir: directory comprising EPIC2/EPIC/450K idats to analyse
-- sample_sheet: sample sheet contianing at least info about `sample name` and `array position`
-- array_position: sample sheet column name containing information about array position (sentrix ID and sentrix position) e.g. `205723740073_R03C02`
-- sample_name: sample sheet column name containing sample name
-- results_dir: results directory [the same as in flow_one]
+- `methylation_idats_dir`: directory comprising EPIC2/EPIC/450K idats to analyse
+- `sample_sheet`: sample sheet contianing at least info about `sample name` and `array position`
+- `array_position`: sample sheet column name containing information about array position (sentrix ID and sentrix position) e.g. `205723740073_R03C02`
+- `sample_name`: sample sheet column name containing sample name
+- `results_dir`: results directory [the same as in flow_one]
 
 Workflow config example:
 
