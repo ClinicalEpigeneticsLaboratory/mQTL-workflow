@@ -6,7 +6,7 @@ from multiprocessing import Pool
 
 import pandas as pd
 from tqdm import tqdm
-import scipy.stats as sts
+import statsmodels.api as sm
 from statsmodels.stats.multitest import fdrcorrection
 
 
@@ -148,6 +148,10 @@ if __name__ == "__main__":
     methylation_map = generate_methylation_map(methylation_manifest, methylation_frame)
     gsa_map = generate_gsa_map(gsa_manifest, genotype_frame)
 
+    common_samples = list(set.intersection(set(methylation_frame.columns), set(genotype_frame.columns)))
+    genotype_frame = genotype_frame[common_samples]
+    methylation_frame = methylation_frame[common_samples]
+    
     with Pool(int(nCPU)) as p:
         results = p.map(analyse, gsa_map.keys())
 

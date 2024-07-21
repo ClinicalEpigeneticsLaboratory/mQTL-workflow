@@ -182,14 +182,12 @@ process filterBCF {
 
 process createGenotypeFrame {
     publishDir "$params.results_dir/flow_one", mode: 'copy', overwrite: true, pattern: 'genotype_table.traw'
-    publishDir "$params.results_dir/flow_one", mode: 'copy', overwrite: true, pattern: '*.frq'
 
     input:
     path filtered_merged_bcf_file
 
     output: 
     path 'genotype_table.traw', emit: frame
-    path '*.frq'
 
     script: 
     """
