@@ -2,9 +2,9 @@
 include { loadMynorm; loadGenotypeFrame; loadBCF } from './modules/utils.nf'
 
 // Workflow Params
-params.results_dir = file('results/')
-params.csv_gsa_manifest = file('resources/GSA-24v3-0_A1.csv')
-params.csv_methylation_manifest = file('resources/infinium-methylationepic-v-1-0-b5-manifest-file.csv')
+params.results_dir = ''
+params.csv_gsa_manifest = ''
+params.csv_methylation_manifest = ''
 
 params.vep_annotations = false
 params.genome_assembly = "GRCh37"
@@ -16,10 +16,6 @@ params.clump_p1 = 0.0001
 params.clump_p2 = 0.01      
 params.clump_r2 = 0.50      
 params.clump_kb = 250     
-
-mynorm = loadMynorm( params.results_dir )
-genotype_table = loadGenotypeFrame( params.results_dir )
-bcf = loadBCF( params.results_dir )
 
 log.info """\
             mQTL $version Worklow three [mQTL]
@@ -45,9 +41,7 @@ log.info """\
 
             Input:
             ==============
-            Methylation frame: $mynorm
-            Genotype table: $genotype_table
-            BCF file: $bcf
+            Results from flow_one and flow_two are expected to be in [--results_dir <path>]: ${params.results_dir}
             
             Output:
             ==============
@@ -56,10 +50,17 @@ log.info """\
 """.stripIndent()
 
 process validateParams {
+    input: 
+    path csv_gsa_manifest
+    path csv_methylation_manifest
+    path mynorm
+    path genotype_table
+    path bcf
+
     script:
     """
-
     #!/usr/bin/python3
+
     import os
     import multiprocessing
     import pandas as pd 
@@ -69,12 +70,15 @@ process validateParams {
     assert ${params.CPUs} <= cpus_available, f"Exceeded number of available cpus --> {${params.CPUs}} / {cpus_available}" 
 
     # Files flags check
-    files = ["${params.csv_gsa_manifest}", "${params.csv_methylation_manifest}", "$mynorm", "$genotype_table", "$bcf"]
+    files = ["$csv_gsa_manifest", "$csv_methylation_manifest", "$mynorm", "$genotype_table", "$bcf"]
     for file in files:
         assert os.path.exists(file), f"File does not exists {file}"
-
+    
     # Assembly flag check
     assert "${params.genome_assembly}" in ["GRCh37", "GRCh38"], f"--genome_assembly should be either GRCh37 or GRCh38, is ${params.genome_assembly}"
+
+    # VEP flag check 
+    assert "${params.vep_annotations}" in ["true", "false"], f"--vep_annotations should be either true or false, is ${params.vep_annotations}"
 
     """
 }
@@ -85,6 +89,8 @@ process identifyMQTLs {
     input:
     path genotype_table
     path mynorm
+    path csv_gsa_manifest
+    path csv_methylation_manifest
 
     output:
     path 'mQTL.parquet'
@@ -92,7 +98,7 @@ process identifyMQTLs {
     script:
     """
 
-    mqtl.py $genotype_table $mynorm ${params.csv_gsa_manifest} ${params.csv_methylation_manifest} ${params.distance} ${params.CPUs}
+    mqtl.py $genotype_table $mynorm $csv_gsa_manifest $csv_methylation_manifest ${params.distance} ${params.CPUs}
     
     """
 }
@@ -107,23 +113,25 @@ process filterMQTLs {
     output:
     path 'filtered_mQTL.parquet', emit: mqtl_filtered
     path 'cpg_list.txt', emit: cpg_list
+    path 'cpg_pval.txt', emit: cpg_pval_list
     path 'rs_list.txt', emit: rs_list
     path 'rs_pval.txt', emit: rs_pval_list
 
     script:
     """
-
     #!/usr/bin/python3
+    
     import pandas as pd 
 
     mqtl = pd.read_parquet("$mqtls")
+    mqtl[["cpg", "FDR"]].rename({"cpg": "CpG", "FDR": "P"}, axis=1).drop_duplicates().to_csv("cpg_pval.txt", index=False, sep="\t")
+    mqtl[["rs", "FDR"]].rename({"rs": "SNP", "FDR": "P"}, axis=1).drop_duplicates().to_csv("rs_pval.txt", index=False, sep="\t")
+
     filtered = mqtl[(mqtl.slope.abs() >= float(${params.slope})) & (mqtl.FDR <= float(${params.alpha}))]
-
     filtered.to_parquet("filtered_mQTL.parquet")
-    filtered.cpg.drop_duplicates().to_csv("cpg_list.txt", index=False, header=None, sep="\t")
 
+    filtered.cpg.drop_duplicates().to_csv("cpg_list.txt", index=False, header=None, sep="\t")
     filtered.rs.drop_duplicates().to_csv("rs_list.txt", index=False, header=None, sep="\t")
-    filtered[["rs", "FDR"]].rename({"rs": "SNP", "FDR": "P"}, axis=1).drop_duplicates().to_csv("rs_pval.txt", index=False, sep="\t")
 
     """
 }
@@ -135,12 +143,12 @@ process anotateSNPs {
     path rs_list 
 
     output:
-    path 'report*'
+    path 'vep_report*'
 
     script:
     """
 
-    vep -i $rs_list --format id -o report --assembly ${params.genome_assembly} --database
+    vep -i $rs_list --format id -o vep_report --assembly ${params.genome_assembly} --database
 
     """
 }
@@ -149,6 +157,7 @@ process clumping {
     publishDir "$params.results_dir/flow_three", mode: 'copy', overwrite: true, pattern: 'plink.clumped', optional: true
 
     input: 
+    path bcf
     path rs
 
     output:
@@ -163,14 +172,24 @@ process clumping {
 }
 
 workflow {
-    validateParams()
+    // Params
+    csv_gsa_manifest = file(params.csv_gsa_manifest)
+    csv_methylation_manifest = file(params.csv_methylation_manifest)
 
-    mqtls = identifyMQTLs(genotype_table, mynorm)
+    mynorm = loadMynorm( params.results_dir )
+    genotype_table = loadGenotypeFrame( params.results_dir )
+    bcf = loadBCF( params.results_dir )
+
+    // Validate params
+    validateParams( csv_gsa_manifest, csv_methylation_manifest, mynorm, genotype_table, bcf )
+
+    // Workflow
+    mqtls = identifyMQTLs( genotype_table, mynorm, csv_gsa_manifest, csv_methylation_manifest )
     filtered_data = filterMQTLs( mqtls )
 
     if ( params.vep_annotations ){
         anotateSNPs( filtered_data.rs_list )
     }
 
-    clumping( filtered_data.rs_pval_list )
+    clumping( bcf, filtered_data.rs_pval_list )
 }

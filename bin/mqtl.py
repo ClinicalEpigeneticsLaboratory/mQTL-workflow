@@ -104,7 +104,7 @@ def analyse(chr_):
             )
 
     data = pd.DataFrame(stats)
-    _, data["FDR"] = fdrcorrection(data["p-value"])
+    _, data["FDR"] = fdrcorrection(data["p-value"], method="n")
     data["distance"] = data["rs POS"] - data["cpg POS"]
     data.distance = data.distance.abs()
 

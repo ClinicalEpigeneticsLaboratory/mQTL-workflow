@@ -1,9 +1,9 @@
 #!/usr/bin/env nextflow
 
 // Workflow Params
-params.sample_sheet = file('sample_sheet.csv')
-params.methylation_idats_dir = file('EPIC/')
-params.results_dir = file('results/')
+params.sample_sheet = ''
+params.methylation_idats_dir = ''
+params.results_dir = ''
 
 params.array_position = 'Sentrix_Info'
 params.sample_name = 'Sample_Name'
@@ -33,6 +33,10 @@ log.info """\
 """.stripIndent()
 
 process validateParams {
+    input:
+    path methylation_idats_dir
+    path sample_sheet
+    
     script:
     """
     #!/usr/bin/python3
@@ -45,12 +49,12 @@ process validateParams {
     assert ${params.CPUs} <= cpus_available, f"Exceeded number of available cpus --> {${params.CPUs}} / {cpus_available}" 
 
     # Files flags check
-    files = ["${params.sample_sheet}", "${params.methylation_idats_dir}"]
+    files = ["$methylation_idats_dir", "$sample_sheet"]
     for file in files:
         assert os.path.exists(file), f"File does not exists {file}"
 
     # --array_position and --sample_name flags check
-    sample_sheet_fields = pd.read_csv("${params.sample_sheet}").columns
+    sample_sheet_fields = pd.read_csv("$sample_sheet").columns
     assert "${params.array_position}" in sample_sheet_fields, f"${params.array_position} not present in sample sheet columns: {sample_sheet_fields}"
     assert "${params.sample_name}" in sample_sheet_fields, f"${params.sample_name} not present in sample sheet columns: {sample_sheet_fields}"
 
@@ -65,6 +69,7 @@ process validateParams {
 process prepareIDATs {
     input:
     path idats
+    path sample_sheet
 
     output: 
     path 'prepared_idats_directory', type: 'dir'
@@ -72,7 +77,7 @@ process prepareIDATs {
     script:
     """
     
-    prepare_idats.py $idats ${params.sample_sheet} ${params.array_position} prepared_idats_directory
+    prepare_idats.py $idats $sample_sheet ${params.array_position} prepared_idats_directory
 
     """
 }
@@ -102,6 +107,7 @@ process renameSamples {
 
     input:
     path mynorm
+    path sample_sheet
 
     output:
     path 'mynorm.parquet'
@@ -109,7 +115,7 @@ process renameSamples {
     script:
     """
 
-    rename_samples.py $mynorm ${params.sample_sheet} ${params.array_position} ${params.sample_name}
+    rename_samples.py $mynorm $sample_sheet ${params.array_position} ${params.sample_name}
 
     """
 }
@@ -134,11 +140,17 @@ process CellFractionCorrection {
 }
 
 workflow {
-    validateParams()
+    // Params
+    methylation_idats_dir = file(params.methylation_idats_dir)
+    sample_sheet = file(params.sample_sheet)
 
-    prepared_idats = prepareIDATs( params.methylation_idats_dir )
+    // Validate params
+    validateParams( methylation_idats_dir, sample_sheet )
+
+    // Workflow
+    prepared_idats = prepareIDATs( methylation_idats_dir, sample_sheet )
     mynorm = processIDATs( prepared_idats )
-    mynorm = renameSamples( mynorm )
+    mynorm = renameSamples( mynorm, sample_sheet )
 
     if ( params.correction == true ) {
         mynorm = CellFractionCorrection( mynorm )
