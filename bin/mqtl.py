@@ -6,7 +6,7 @@ from multiprocessing import Pool
 
 import pandas as pd
 from tqdm import tqdm
-import statsmodels.api as sm
+import scipy.stats as sts
 from statsmodels.stats.multitest import fdrcorrection
 
 
