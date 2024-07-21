@@ -224,8 +224,8 @@ results directory [--results_dir <path>]: ../test/results/
 ```
 
 Workflow output is placed in <results_dir/flow_three> directory, and includes:
-- `mQTL.parquet` - tabular file comprising mQTL stats
-- `filtered_mQTL.parquet` - tabular file comprising filtered mQTLs based on --alpha and --slope parameters 
+- `mQTL.parquet` - tabular file comprising mQTL statistics
+- `filtered_mQTL.parquet` - tabular file comprising filtered mQTLs based on `--alpha` and `--slope` parameters 
 - `cpg_list.txt` and `rs_list.txt` - lists of CpGs as well as rsIDs for all significant mQTLs
 - `cpg_pval.txt` and `rs_pval.txt` - lists of all assesed CpGs/SNPs along with FDR corrected p-value (Benjamini/Yekutieli)
 - `ve_report` and `vep_report_summary.html` - VEP output generated for 'rs_list.txt'
