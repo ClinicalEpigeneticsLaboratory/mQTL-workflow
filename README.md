@@ -61,15 +61,15 @@ Workflow basic command:
 ```
 nextflow run flow_one.nf --reference_fa <path> --bmp_manifest <path> --csv_manifest <path> --cluster_file <path> --gsa_idats_dir <path> --sample_sheet <path> --array_position <str> --sample_name <str> --results_dir <path>
 ```
-- reference_fa: path to directory comprising reference genom [*.fa] as well as genome index [*.fai]
-- bmp_manifest: path to GSA array specific BMP manifest file
-- csv_manifest: path to GSA array specific CSV manifest file
-- cluster_file: path to GSA array specific cluster file
-- gsa_idats_dir: directory comprising GSA idats
-- sample_sheet: sample sheet contianing at least info about `sample name` and `array position`
-- array_position: sample sheet column name containing information about array position (sentrix ID and sentrix position) e.g. `205723740073_R03C02`
-- sample_name: sample sheet column name containing sample name
-- results_dir: results directory
+- 'reference_fa': path to directory comprising reference genom [*.fa] as well as genome index [*.fai]
+- 'bmp_manifest': path to GSA array specific BMP manifest file
+- 'csv_manifest': path to GSA array specific CSV manifest file
+- 'cluster_file': path to GSA array specific cluster file
+- 'gsa_idats_dir': directory comprising GSA idats
+- 'sample_sheet': sample sheet contianing at least info about `sample name` and `array position`
+- 'array_position': sample sheet column name containing information about array position (sentrix ID and sentrix position) e.g. `205723740073_R03C02`
+- 'sample_name': sample sheet column name containing sample name
+- 'results_dir': results directory
 
 
 **IMPORTANT NOTES:** 
