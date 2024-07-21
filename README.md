@@ -121,7 +121,7 @@ This workflow will preprocess methylation array data from Illumina. It involves 
 ```
 0. Sanity check
 1. Sesame preprocessing: use the Sesame R package for preprocessing (prep code: QCDPB) the methylation data.
-3. Cell fraction correction: use linear models to adjust for cellular composition in the samples. [OPTIONAL]
+3. Cell fraction correction: use linear models to adjust for cellular composition in the samples. [OPTIONAL] (PMID: 36076479)
 4. Exporting normalized or normalized AND adjusted for tissue composition beta-matrix frame (mynorm.parquet).
 5. If cell fraction correction has been performed workflow will also export estimated cell proportions before (CF.csv) and after (CFc.csv) data adjustment.
 

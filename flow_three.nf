@@ -8,7 +8,7 @@ params.csv_methylation_manifest = ''
 
 params.vep_annotations = false
 params.genome_assembly = "GRCh37"
-params.distance = 50000
+params.distance = 250000
 params.alpha = 0.05
 params.slope = 0.05
 
@@ -29,7 +29,7 @@ log.info """\
             VEP annotations [--vep_annotations <boolean: true/false>]: ${params.vep_annotations} [default: false (very slow)]
             Alpha [--alpha <float>]: ${params.alpha} [default: 0.05]
             Slope [--slope <float>]: ${params.slope} [default: 0.05]
-            Distance [--distance <int>]: ${params.distance} [default: 50000]
+            Distance [--distance <int>]: ${params.distance} [default: 250000]
             Number of CPUs [--CPUs <int>]: ${params.CPUs} [default: 10]
 
             PLINK config:
