@@ -124,8 +124,8 @@ process filterMQTLs {
     import pandas as pd 
 
     mqtl = pd.read_parquet("$mqtls")
-    mqtl[["cpg", "FDR"]].rename({"cpg": "CpG", "FDR": "P"}, axis=1).drop_duplicates().to_csv("cpg_pval.txt", index=False, sep="\t")
-    mqtl[["rs", "FDR"]].rename({"rs": "SNP", "FDR": "P"}, axis=1).drop_duplicates().to_csv("rs_pval.txt", index=False, sep="\t")
+    mqtl[["cpg", "FDR"]].rename({"cpg": "CpG", "FDR": "P"}, axis=1).groupby("CpG").min().to_csv("cpg_pval.txt", sep="\t")
+    mqtl[["rs", "FDR"]].rename({"rs": "SNP", "FDR": "P"}, axis=1).groupby("SNP").min().to_csv("rs_pval.txt", sep="\t")
 
     filtered = mqtl[(mqtl.slope >= float(${params.slope})) & (mqtl.FDR <= float(${params.alpha}))]
     filtered.to_parquet("filtered_mQTL.parquet")
@@ -148,7 +148,7 @@ process anotateSNPs {
     script:
     """
 
-    vep -i $rs_list --format id -o vep_report --assembly ${params.genome_assembly} --database
+    vep -i $rs_list --format id -o vep_report --assembly ${params.genome_assembly} --database --biotype --variant_class --sift b --polyphen b
 
     """
 }

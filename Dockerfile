@@ -48,6 +48,12 @@ RUN cd /usr/local/bin && git clone https://github.com/Ensembl/ensembl-vep.git &&
     perl INSTALL.pl --AUTO a
 ENV PATH="/usr/local/bin/ensembl-vep/:$PATH" 
 
+# Install HOMER
+RUN mkdir /usr/local/bin/homer && cd /usr/local/bin/homer && wget http://homer.ucsd.edu/homer/configureHomer.pl && \
+    perl configureHomer.pl -install && \
+    perl configureHomer.pl -install hg19 hg38
+ENV PATH="/usr/local/bin/homer/bin:$PATH" 
+
 # Set the working directory
 WORKDIR /workspace
 
