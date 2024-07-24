@@ -63,7 +63,7 @@ nextflow run flow_one.nf --reference_fa <path> --bmp_manifest <path> --csv_manif
 ```
 - `reference_fa`: path to directory comprising reference genom [*.fa] as well as genome index [*.fai]
 - `bmp_manifest`: path to GSA array specific BMP manifest file
-- `csv_manifest`: path to GSA array specific CSV manifest file
+- `csv_manifest`: path to GSA array specific CSV manifest file (it should contain `Name`, `Chr` and `MapInfo` fields)
 - `cluster_file`: path to GSA array specific cluster file
 - `gsa_idats_dir`: directory comprising GSA idats
 - `sample_sheet`: sample sheet contianing at least info about `sample name` and `array position`
@@ -85,11 +85,11 @@ mQTL 1.0v Worklow one [SNPs arrays]
 
 Config:
 ==============
-Ref. genome directory [should include *.fa and *.fai files] [--reference_fa <path>]: ../test/resources/
-BMP manifest [--bmp_manifest <path>]: ../test/resources/GSA-24v3-0_A1.bpm
-CSV manifest [--csv_manifest <path>]: ../test/resources/GSA-24v3-0_A1.csv
-Cluster file [--cluster_file <path>]: ../test/resources/GSA-24v3-0_A1_ClusterFile.egt
-Number of CPUs [--CPUs <int>]: 10 [default: 10]
+Ref. genome directory [should include *.fa and *.fai files] [--reference_fa <path>]: ../mQTL/resources/
+BMP manifest [--bmp_manifest <path>]: ../mQTL/resources/GSA-24v3-0_A1.bpm
+CSV manifest [--csv_manifest <path>]: ../mQTL/resources/GSA-24v3-0_A1.csv
+Cluster file [--cluster_file <path>]: ../mQTL/resources/GSA-24v3-0_A1_ClusterFile.egt
+Number of CPUs [--CPUs <int>]: 22 [default: 10]
 
 PLINK params:
 ==============
@@ -99,14 +99,14 @@ GENO [--GENO <float>]: 0.1 [default: 0.1]
 
 Input:
 ==============
-GSA idats [--gsa_idats_dir <path>]: ../test/GSA/
-Sample sheet [--sample_sheet <path>]: ../test/sample_sheet.csv
+GSA idats [--gsa_idats_dir <path>]: ../mQTL/GSA/idats/
+Sample sheet [--sample_sheet <path>]: ../mQTL/sample_sheet.csv
 Array position column [--array_position <str>]: ArrayPicker
 Sample name column [--sample_name <str>]: Sample_Name
 
 Output:
 ==============
-results directory [--results_dir <path>]: ../test/results
+results directory [--results_dir <path>]: ../mQTL/results
 ```
 
 Workflow output is placed in <results_dir/flow_one> directory, and includes:
@@ -184,7 +184,7 @@ This workflow will analyze data from flow_one and flow_two to identify mQTLs. It
 Workflow basic command:
 
 ```
-nextflow run flow_three.nf --csv_gsa_manifest <path> --csv_methylation_manifest <path> --results_dir <path>
+nextflow run flow_three.nf --csv_gsa_manifest <path> --csv_methylation_manifest <path> --conversion_file <path> --results_dir <path> 
 ```
 
 - csv_gsa_manifest: GSA manifest file
@@ -200,8 +200,8 @@ Config:
 ==============
 GSA manifest [--csv_gsa_manifest <path>]: ../test/resources/GSA-24v3-0_A1.csv
 Methylation manifest [--csv_methylation_manifest <path>]: ../test/resources/infinium-methylationepic-v-1-0-b5-manifest-file.csv
-Genome assembly [--genome_assembly <str>]: GRCh37 [default: GRCh37 (important if VEP is ON)]
-VEP annotations [--vep_annotations <boolean: true/false>]: false [default: false (very slow)]
+Conversion file [--conversion_file <path>]: ../mQTL/resources/GSA-24v3-0_A1_b151_rsids.txt
+Genome assembly [--genome_assembly <str>]: GRCh37 [default: GRCh37]
 Alpha [--alpha <float>]: 0.05 [default: 0.05]
 Slope [--slope <float>]: 0.05 [default: 0.05]
 Distance [--distance <int>]: 50000 [default: 50000]
@@ -223,14 +223,17 @@ Output:
 results directory [--results_dir <path>]: ../test/results/
 ```
 
+**IMPORTANT:**
+- `conversion file`: path to GSA conversion file (it should contain `Name` column corresponding to `Name` column in csv_manifest and `RsID` column)
+
 Workflow output is placed in <results_dir/flow_three> directory, and includes:
 - `mQTL.parquet` - tabular file comprising mQTL statistics
 - `filtered_mQTL.parquet` - tabular file comprising filtered mQTLs based on `--alpha` and `--slope` parameters 
-- `cpg_list.txt` and `rs_list.txt` - lists of CpGs as well as rsIDs for all significant mQTLs
 - `cpg_pval.txt` and `rs_pval.txt` - lists of all assesed CpGs/SNPs along with FDR corrected p-value (Benjamini/Yekutieli)
-- `ve_report` and `vep_report_summary.html` - VEP output generated for `rs_list.txt`
+- `vep_report` and `vep_report_summary.html` - VEP report
 - `plink.clumped` - clumping results generated based on `rs_pval.txt` and `filtered_merged.bcf`
-  
+- `*.homer.html` - HOMER reports
+
 ### Contributing
 Contributions to the project are welcome. Please fork the repository, make your changes, and submit a pull request.
 
