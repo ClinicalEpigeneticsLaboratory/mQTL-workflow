@@ -45,7 +45,9 @@ ENV PATH="/usr/local/bin/array-analysis-cli-linux-x64-v2.1.0/array-analysis-cli:
 RUN apt install perl libdbi-perl libdbd-mysql-perl liblist-moreutils-perl libwww-perl libmodule-build-perl -y
 RUN cd /usr/local/bin && git clone https://github.com/Ensembl/ensembl-vep.git && \
     cd ensembl-vep && \
-    perl INSTALL.pl --AUTO a
+    perl INSTALL.pl --AUTO a && \
+    perl INSTALL.pl --AUTO c --SPECIES homo_sapiens --ASSEMBLY GRCh37 --CACHEDIR "/usr/local/.vep" && \
+    perl INSTALL.pl --AUTO c --SPECIES homo_sapiens --ASSEMBLY GRCh38 --CACHEDIR "/usr/local/.vep"
 ENV PATH="/usr/local/bin/ensembl-vep/:$PATH" 
 
 # Install HOMER
@@ -61,9 +63,8 @@ WORKDIR /workspace
 COPY requirements.R poetry.lock pyproject.toml info.sh .
 
 # Install R components
-# R is nightmare ...
-ENV EXPERIMENT_HUB_CACHE="/usr/local/.ExperimentHub"
 RUN apt install -y libcurl4-openssl-dev libssl-dev libxml2-dev
+ENV EXPERIMENT_HUB_CACHE="/usr/local/.ExperimentHub"
 RUN Rscript requirements.R
 RUN chmod -R +766 "/usr/local/.ExperimentHub"
 

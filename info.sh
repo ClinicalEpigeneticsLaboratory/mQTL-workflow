@@ -9,6 +9,7 @@ echo Illumina CLI: $(array-analysis-cli --version)
 echo VEP: $(vep -v)
 
 echo R environment:
+echo $(Rscript -e 'sessionInfo()')
 echo $(Rscript -e 'sesame::sesame_checkVersion()')
 
 echo Python environment:
