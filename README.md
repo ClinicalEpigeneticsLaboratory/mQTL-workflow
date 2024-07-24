@@ -47,13 +47,13 @@ The first workflow preprocesses SNP array data from Illumina microarrays. It inv
 0. Sanity check
 1. Convert idat to gtc: Convert raw idat files to gtc format.
 2. Convert gtc to vcf: Convert gtc files to VCF format.
-3. Index and merge VCF files: Index and merge VCF files into a BCF file.
+3. Index and merge VCF files: Index and merge VCF files.
 4. Filtering and formatting:
     1. Use PLINK to filter the merged BCF file.
     2. Apply filters: minor allele frequency (--maf 0.05), Hardy-Weinberg equilibrium (--hwe 1e-50), genotype missingness (--geno 0.1), and autosome restriction.
     3. Extract only bi-allelic loci.
-    4. Recode to a transposed format.
-5. Exporting results files (*.bcf, *.frq, *.traw as well as recoded traw file - *.parquet).
+    4. Recode VCF file.
+5. Exporting results files (VCF file: *.vcf.gz, genotype table: *.parquet as well as plink logs: *.log).
 ```
 
 Workflow basic command:
@@ -110,9 +110,9 @@ results directory [--results_dir <path>]: ../mQTL/results
 ```
 
 Workflow output is placed in <results_dir/flow_one> directory, and includes:
-- `filtered_merged.bcf` - merged VCF files, filtered for biallelic loci
-- `genotype_table.traw` - BCF file converted to PLINK traw format
-- `genotype_table.parquet` - final tabular file comprising information about genotype per sample
+- `genotypes.vcf.gz` - merged and filtered for biallelic loci VCF file
+- `genotype_table.parquet` - VCF file converted to PLINK traw format and recoded to [sample x genotype] dataframe
+- `*.log` - plink log files
 
 ### Workflow two: Methylation Array Data Preprocessing
 
@@ -187,9 +187,10 @@ Workflow basic command:
 nextflow run flow_three.nf --csv_gsa_manifest <path> --csv_methylation_manifest <path> --conversion_file <path> --results_dir <path> 
 ```
 
-- csv_gsa_manifest: GSA manifest file
-- csv_methylation_manifest: 450K/EPIC/EPIV2 manifest file 
-- results_dir: results directory [the same as in flow_one and flow_two]
+- `csv_gsa_manifest`: GSA manifest file
+- `csv_methylation_manifest:` 450K/EPIC/EPIV2 manifest file 
+- `conversion file`: path to GSA conversion file (it should contain `Name` column corresponding to `Name` column in csv_manifest and `RsID` column)
+- `results_dir`: results directory [the same as in flow_one and flow_two]
 
 Workflow config example:
 ```
@@ -223,14 +224,12 @@ Output:
 results directory [--results_dir <path>]: ../test/results/
 ```
 
-**IMPORTANT:**
-- `conversion file`: path to GSA conversion file (it should contain `Name` column corresponding to `Name` column in csv_manifest and `RsID` column)
-
 Workflow output is placed in <results_dir/flow_three> directory, and includes:
-- `mQTL.parquet` - tabular file comprising mQTL statistics
-- `filtered_mQTL.parquet` - tabular file comprising filtered mQTLs based on `--alpha` and `--slope` parameters 
+- `mQTL.parquet` - tabular file comprising all mQTL statistics
+- `filtered_mQTL.parquet` - tabular file comprising filtered mQTLs based on `--alpha` and `--slope` parameters
 - `cpg_pval.txt` and `rs_pval.txt` - lists of all assesed CpGs/SNPs along with FDR corrected p-value (Benjamini/Yekutieli)
-- `vep_report` and `vep_report_summary.html` - VEP report
+- `*.bed files` - BED files for input and BG generated separately for SNPs and CpGs
+- `vep_report` and `vep_report_summary.html` - VEP report generated for filtered mQTLs 
 - `plink.clumped` - clumping results generated based on `rs_pval.txt` and `filtered_merged.bcf`
 - `*.homer.html` - HOMER reports
 
