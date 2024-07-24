@@ -1,10 +1,12 @@
 #!/usr/bin/env nextflow
-include { loadMynorm; loadGenotypeFrame; loadBCF } from './modules/utils.nf'
+include { loadMynorm; loadGenotypeFrame; loadVCF } from './modules/utils.nf'
+include { adjustCPUs } from './modules/utils.nf'
 
 // Workflow Params
 params.results_dir = ''
 params.csv_gsa_manifest = ''
 params.csv_methylation_manifest = ''
+params.conversion_file = ''
 
 params.vep_annotations = false
 params.genome_assembly = "GRCh37"
@@ -12,10 +14,13 @@ params.distance = 250000
 params.alpha = 0.05
 params.slope = 0.05
 
-params.clump_p1 = 0.0001       
-params.clump_p2 = 0.01      
-params.clump_r2 = 0.50      
-params.clump_kb = 250     
+params.clump_p1 = 0.0001
+params.clump_p2 = 0.01
+params.clump_r2 = 0.50
+params.clump_kb = 250
+
+// HOMER
+homer_cpus = adjustCPUs( params.CPUs )
 
 log.info """\
             mQTL $version Worklow three [mQTL]
@@ -25,12 +30,14 @@ log.info """\
             ==============
             GSA manifest [--csv_gsa_manifest <path>]: ${params.csv_gsa_manifest}
             Methylation manifest [--csv_methylation_manifest <path>]: ${params.csv_methylation_manifest}
-            Genome assembly [--genome_assembly <str>]: ${params.genome_assembly} [default: GRCh37 (important if VEP is ON)]
-            VEP annotations [--vep_annotations <boolean: true/false>]: ${params.vep_annotations} [default: false (very slow)]
+            Conversion file [--conversion_file <path>]: ${params.conversion_file}
+            Genome assembly [--genome_assembly <str>]: ${params.genome_assembly} [default: GRCh37]
+            Number of CPUs [--CPUs <int>]: ${params.CPUs} [default: 10]
+
+            mQTL config:
             Alpha [--alpha <float>]: ${params.alpha} [default: 0.05]
             Slope [--slope <float>]: ${params.slope} [default: 0.05]
             Distance [--distance <int>]: ${params.distance} [default: 250000]
-            Number of CPUs [--CPUs <int>]: ${params.CPUs} [default: 10]
 
             PLINK config:
             ==============
@@ -53,9 +60,10 @@ process validateParams {
     input: 
     path csv_gsa_manifest
     path csv_methylation_manifest
+    path conversion_file
     path mynorm
     path genotype_table
-    path bcf
+    path vcf
 
     script:
     """
@@ -70,7 +78,7 @@ process validateParams {
     assert ${params.CPUs} <= cpus_available, f"Exceeded number of available cpus --> {${params.CPUs}} / {cpus_available}" 
 
     # Files flags check
-    files = ["$csv_gsa_manifest", "$csv_methylation_manifest", "$mynorm", "$genotype_table", "$bcf"]
+    files = ["$csv_gsa_manifest", "$csv_methylation_manifest", "$conversion_file", "$mynorm", "$genotype_table", "$vcf"]
     for file in files:
         assert os.path.exists(file), f"File does not exists {file}"
     
@@ -91,6 +99,7 @@ process identifyMQTLs {
     path mynorm
     path csv_gsa_manifest
     path csv_methylation_manifest
+    path conversion_file
 
     output:
     path 'mQTL.parquet'
@@ -98,14 +107,14 @@ process identifyMQTLs {
     script:
     """
 
-    mqtl.py $genotype_table $mynorm $csv_gsa_manifest $csv_methylation_manifest ${params.distance} ${params.CPUs}
+    mqtl.py $genotype_table $mynorm $csv_gsa_manifest $csv_methylation_manifest $conversion_file ${params.distance} ${params.CPUs}
     
     """
 }
 
 process filterMQTLs {
     publishDir "$params.results_dir/flow_three", mode: 'copy', overwrite: true, pattern: 'filtered_mQTL.parquet'
-    publishDir "$params.results_dir/flow_three", mode: 'copy', overwrite: true, pattern: '*.txt'
+    publishDir "$params.results_dir/flow_three", mode: 'copy', overwrite: true, pattern: '*pval.txt'
 
     input:
     path mqtls
@@ -125,39 +134,106 @@ process filterMQTLs {
 
     mqtl = pd.read_parquet("$mqtls")
     mqtl[["cpg", "FDR"]].rename({"cpg": "CpG", "FDR": "P"}, axis=1).groupby("CpG").min().to_csv("cpg_pval.txt", sep="\t")
-    mqtl[["rs", "FDR"]].rename({"rs": "SNP", "FDR": "P"}, axis=1).groupby("SNP").min().to_csv("rs_pval.txt", sep="\t")
+    mqtl[["snp", "FDR"]].rename({"snp": "SNP", "FDR": "P"}, axis=1).groupby("SNP").min().to_csv("rs_pval.txt", sep="\t")
 
     filtered = mqtl[(mqtl.slope >= float(${params.slope})) & (mqtl.FDR <= float(${params.alpha}))]
     filtered.to_parquet("filtered_mQTL.parquet")
 
     filtered.cpg.drop_duplicates().to_csv("cpg_list.txt", index=False, header=None, sep="\t")
-    filtered.rs.drop_duplicates().to_csv("rs_list.txt", index=False, header=None, sep="\t")
+    filtered.snp.drop_duplicates().to_csv("rs_list.txt", index=False, header=None, sep="\t")
 
     """
 }
 
 process anotateSNPs {
-    publishDir "$params.results_dir/flow_three", mode: 'copy', overwrite: true, pattern: 'report*'
+    publishDir "$params.results_dir/flow_three", mode: 'copy', overwrite: true, pattern: 'vep_report*'
+    publishDir "$params.results_dir/flow_three", mode: 'copy', overwrite: true, pattern: 'mQTL.vcf.gz'
 
     input:
-    path rs_list 
+    path vcf
+    path rs_list
 
     output:
     path 'vep_report*'
+    path 'mQTL.vcf.gz'
 
     script:
     """
 
-    vep -i $rs_list --format id -o vep_report --assembly ${params.genome_assembly} --database --biotype --variant_class --sift b --polyphen b
+    bcftools view -i 'ID=@$rs_list' --threads ${params.CPUs} -O z -o mQTL.vcf.gz $vcf
+    vep -i mQTL.vcf.gz -o vep_report --assembly ${params.genome_assembly} --cache --offline --fork ${params.CPUs} --dir_cache "/usr/local/.vep"
 
     """
 }
+
+process exportBEDfiles {
+    publishDir "$params.results_dir/flow_three", mode: 'copy', overwrite: true, pattern: '*.bed'
+
+    input:
+    path mqtl
+
+    output:
+    tuple val('SNP'), path('snpInput.bed'), path('snpBg.bed'), emit: snp
+    tuple val('CpG'), path('cpgInput.bed'), path('cpgBg.bed'), emit: cpg
+
+
+    script:
+    """
+    #!/usr/bin/python3
+    
+    import pandas as pd 
+
+    mqtl = pd.read_parquet("$mqtl")
+
+    cpg = mqtl[["CHR", "cpg", "cpg POS"]]
+    cpg["start"] = cpg["cpg POS"] - 1
+    cpg[["CHR", "start", "cpg POS", "cpg"]].drop_duplicates().sort_values(["CHR", "start"]).to_csv(f"cpgBg.bed", index=False, header=None, sep="\t")
+
+    snp = mqtl[["CHR", "snp", "snp POS"]]
+    snp["start"] = snp["snp POS"] - 1
+    snp[["CHR", "start", "snp POS", "snp"]].drop_duplicates().sort_values(["CHR", "start"]).to_csv(f"snpBg.bed", index=False, header=None, sep="\t")
+
+    mqtl = mqtl[(mqtl.slope >= float(${params.slope})) & (mqtl.FDR <= float(${params.alpha}))]
+
+    cpg = mqtl[["CHR", "cpg", "cpg POS"]]
+    cpg["start"] = cpg["cpg POS"] - 1
+    cpg[["CHR", "start", "cpg POS", "cpg"]].drop_duplicates().sort_values(["CHR", "start"]).to_csv(f"cpgInput.bed", index=False, header=None, sep="\t")
+
+    snp = mqtl[["CHR", "snp", "snp POS"]]
+    snp["start"] = snp["snp POS"] - 1
+    snp[["CHR", "start", "snp POS", "snp"]].drop_duplicates().sort_values(["CHR", "start"]).to_csv(f"snpInput.bed", index=False, header=None, sep="\t")
+
+    """
+}
+
+
+process runHomer {
+    publishDir "$params.results_dir/flow_three", mode: 'copy', overwrite: true, pattern: '*_homer.html'
+
+    input:
+    tuple val(type), path(input), path(bg)
+
+    output:
+    path '*_homer.html'
+
+    script:
+    """
+    if [[ "${params.genome_assembly}" == "GRCh37" ]]; then
+        findMotifsGenome.pl $input hg19 "homer/$type" -bg $bg -mask -nomotif -h -p ${homer_cpus}
+    else
+        findMotifsGenome.pl $input hg38 "homer/$type" -bg $bg -mask -nomotif -h -p ${homer_cpus}
+    fi
+
+    cp homer/$type/knownResults.html $type"_homer.html"
+    """
+}
+
 
 process clumping {
     publishDir "$params.results_dir/flow_three", mode: 'copy', overwrite: true, pattern: 'plink.clumped', optional: true
 
     input: 
-    path bcf
+    path vcf
     path rs
 
     output:
@@ -166,7 +242,7 @@ process clumping {
     script: 
     """
 
-    plink --bcf $bcf --clump $rs --clump-p1 ${params.clump_p1} --clump-p2 ${params.clump_p2} --clump-r2 ${params.clump_r2} --clump-kb ${params.clump_kb}  
+    plink --vcf $vcf --clump $rs --clump-p1 ${params.clump_p1} --clump-p2 ${params.clump_p2} --clump-r2 ${params.clump_r2} --clump-kb ${params.clump_kb}
 
     """
 }
@@ -175,21 +251,23 @@ workflow {
     // Params
     csv_gsa_manifest = file(params.csv_gsa_manifest)
     csv_methylation_manifest = file(params.csv_methylation_manifest)
+    conversion_file = file(params.conversion_file)
 
     mynorm = loadMynorm( params.results_dir )
     genotype_table = loadGenotypeFrame( params.results_dir )
-    bcf = loadBCF( params.results_dir )
+    vcf = loadVCF( params.results_dir )
 
     // Validate params
-    validateParams( csv_gsa_manifest, csv_methylation_manifest, mynorm, genotype_table, bcf )
+    validateParams( csv_gsa_manifest, csv_methylation_manifest, conversion_file, mynorm, genotype_table, vcf )
 
     // Workflow
-    mqtls = identifyMQTLs( genotype_table, mynorm, csv_gsa_manifest, csv_methylation_manifest )
+    mqtls = identifyMQTLs( genotype_table, mynorm, csv_gsa_manifest, csv_methylation_manifest, conversion_file )
     filtered_data = filterMQTLs( mqtls )
+    
+    beds = exportBEDfiles( mqtls )
+    beds.snp.mix(beds.cpg).set { combinedChannel }
 
-    if ( params.vep_annotations ){
-        anotateSNPs( filtered_data.rs_list )
-    }
-
-    clumping( bcf, filtered_data.rs_pval_list )
+    runHomer ( combinedChannel )
+    anotateSNPs( vcf, filtered_data.rs_list )
+    clumping( vcf, filtered_data.rs_pval_list )
 }

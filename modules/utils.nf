@@ -20,12 +20,21 @@ def loadGenotypeFrame ( dir ) {
     }
 }
 
-def loadBCF ( dir ) {
-    if ( file("$dir/flow_one/filtered_merged.bcf").exists() ) {
-        return file("$dir/flow_one/filtered_merged.bcf")
+def loadVCF ( dir ) {
+    if ( file("$dir/flow_one/genotypes.vcf.gz").exists() ) {
+        return file("$dir/flow_one/genotypes.vcf.gz")
     }
     else {
-        error("BCF file does not exists in $dir/flow_one/ directory!")
+        error("VCF file does not exists in $dir/flow_one/ directory!")
     }
  
+}
+
+def adjustCPUs ( CPUs ) {
+    if ( CPUs > 1 ){
+        return Math.round( CPUs / 2 )
+    } 
+    else {
+        return 1
+    }
 }

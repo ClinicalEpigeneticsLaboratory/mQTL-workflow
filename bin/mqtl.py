@@ -14,17 +14,16 @@ def generate_gsa_map(
     manifest: str, genomic_frame: pd.DataFrame
 ) -> dict[str, pd.DataFrame]:
     map = {}
-
+    
     manifest = pd.read_csv(manifest, skiprows=7, low_memory=False)
-
-    manifest["rsID"] = manifest.IlmnID.str.extract(r"(rs\d+)")
-    manifest = manifest[["rsID", "Chr", "MapInfo"]]
-
-    manifest = manifest.dropna().set_index("rsID")
+    manifest = manifest[["Name", "Chr", "MapInfo"]]
+    
+    manifest = manifest.dropna().set_index("Name")
     manifest = manifest.loc[
         list(set(manifest.index).intersection(set(genomic_frame.index)))
     ]
 
+    print(manifest)
     manifest.columns = ["CHR", "MAPINFO"]
     manifest["MAPINFO"] = manifest["MAPINFO"].astype(int)
 
@@ -40,7 +39,8 @@ def generate_methylation_map(
 ) -> dict[str, pd.DataFrame]:
     map = {}
 
-    manifest = pd.read_csv(manifest, skiprows=7, low_memory=False, index_col=0)
+    manifest = pd.read_csv(manifest, skiprows=7, low_memory=False).set_index("Name")
+
     manifest = manifest.loc[
         list(set(manifest.index).intersection(set(methylation_frame.index)))
     ]
@@ -55,7 +55,7 @@ def generate_methylation_map(
     return map
 
 
-def encode(values: pd.Series):
+def encode(values: pd.Series) -> dict[str, int]:
     order = sorted(values.unique())
     numerical = list(range(len(order)))
 
@@ -64,18 +64,19 @@ def encode(values: pd.Series):
 
 def analyse(chr_):
     stats = []
-
-    rss_positions_per_chr = gsa_map[chr_]
+    print(methylation_map.keys())
+    
+    snps_positions_per_chr = gsa_map[chr_]
     cpgs_positions_per_chr = methylation_map[chr_]
 
-    for rsID in tqdm(rss_positions_per_chr.index):
-        rs_pos = rss_positions_per_chr.loc[rsID, "MAPINFO"]
-        rs_data = genotype_frame.loc[rsID]
+    for snpID in tqdm(snps_positions_per_chr.index):
+        snp_pos = snps_positions_per_chr.loc[snpID, "MAPINFO"]
+        snp_data = genotype_frame.loc[snpID]
 
-        mapper = encode(rs_data)
-        rs_data = rs_data.replace(mapper)
+        mapper = encode(snp_data)
+        snp_data = snp_data.map(mapper)
 
-        cpgs_in_range = cpgs_positions_per_chr["MAPINFO"] - rs_pos
+        cpgs_in_range = cpgs_positions_per_chr["MAPINFO"] - snp_pos
         cpgs_in_range = cpgs_in_range[
             cpgs_in_range.abs() <= int(distance)
         ].index.tolist()
@@ -88,24 +89,25 @@ def analyse(chr_):
         for cpg, cpg_data in cpgs_in_range.iterrows():
             cpg_pos = cpgs_positions_per_chr.loc[cpg, "MAPINFO"]
 
-            model = sts.linregress(x=rs_data, y=cpg_data)
+            model = sts.linregress(x=snp_data, y=cpg_data)
             slope, r, pval = model.slope, model.rvalue, model.pvalue
             stats.append(
                 {
                     "CHR": chr_,
-                    "rs": rsID,
-                    "rs POS": rs_pos,
+                    "snp": snpID,
+                    "snp POS": snp_pos,
                     "cpg": cpg,
                     "cpg POS": cpg_pos,
                     "slope": abs(slope),
                     "R2": r**2,
-                    "p-value": pval,
+                    "p-value": pval
                 }
             )
 
     data = pd.DataFrame(stats)
     _, data["FDR"] = fdrcorrection(data["p-value"], method="n")
-    data["distance"] = data["rs POS"] - data["cpg POS"]
+    
+    data["distance"] = data["snp POS"] - data["cpg POS"]
     data.distance = data.distance.abs()
 
     return data
@@ -117,18 +119,20 @@ if __name__ == "__main__":
         methylation_frame,
         gsa_manifest,
         methylation_manifest,
+        conversion_file,
         distance,
         nCPU,
     ) = sys.argv[1:]
 
     print(
-        f"""
+    f"""
     INPUT:
     =================================
     Processing genotype frame file: {genotype_frame}
     Processing methylation frame file: {methylation_frame}
     GSA manifest: {gsa_manifest}
     Methylation manifest: {methylation_manifest}
+    Conversion file: {conversion_file}
 
     OPTIONS:
     =================================
@@ -156,4 +160,8 @@ if __name__ == "__main__":
         results = p.map(analyse, gsa_map.keys())
 
     results = pd.concat(results)
+    
+    conversion_file = pd.read_table(conversion_file).set_index("Name")
+    results = pd.merge(conversion_file, results, how="right", left_index=True, right_on="snp")
+    
     results.to_parquet("mQTL.parquet")

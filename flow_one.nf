@@ -153,46 +153,48 @@ process mergeVCF {
     path vcf_files_dir
 
     output:
-    path 'merged.bcf'
+    path 'merged.vcf.gz'
 
     script: 
     """
     
-    bcftools merge --threads ${params.CPUs} -o merged.bcf -O b $vcf_files_dir/*.vcf.gz
+    bcftools merge --threads ${params.CPUs} -o merged.vcf.gz -O z $vcf_files_dir/*.vcf.gz
 
     """
 }
 
-process filterBCF {
-    publishDir "$params.results_dir/flow_one", mode: 'copy', overwrite: true, pattern: 'filtered_merged.bcf'
-
+process filterVCF {
     input:
-    path bcf_file
+    path vcf_file
 
     output:
-    path 'filtered_merged.bcf'
+    path 'filtered_merged.vcf.gz'
 
     script: 
     """
     
-    bcftools view -m 2 -M 2 $bcf_file -O b -o filtered_merged.bcf
+    bcftools view --threads ${params.CPUs} -m 2 -M 2 $vcf_file -O z -o filtered_merged.vcf.gz
 
     """
 }
 
-process createGenotypeFrame {
-    publishDir "$params.results_dir/flow_one", mode: 'copy', overwrite: true, pattern: 'genotype_table.traw'
+process extractGenotypes {
+    publishDir "$params.results_dir/flow_one", mode: 'copy', overwrite: true, pattern: 'genotypes.vcf.gz'
+    publishDir "$params.results_dir/flow_one", mode: 'copy', overwrite: true, pattern: '*.log'
 
     input:
-    path filtered_merged_bcf_file
+    path filtered_merged_vcf_file
 
     output: 
-    path 'genotype_table.traw', emit: frame
+    path 'genotype_table.traw', emit: traw
+    path 'genotypes.vcf.gz', emit: vcf
+    path '*.log'
 
     script: 
     """
 
-    plink --bcf $filtered_merged_bcf_file --maf ${params.MAF} --hwe ${params.HWE} --geno ${params.GENO} --autosome --recode A-transpose -out genotype_table
+    plink --vcf $filtered_merged_vcf_file --maf ${params.MAF} --hwe ${params.HWE} --geno ${params.GENO} --autosome --recode A-transpose -out genotype_table
+    plink --vcf $filtered_merged_vcf_file --maf ${params.MAF} --hwe ${params.HWE} --geno ${params.GENO} --autosome --recode vcf bgz -out genotypes
 
     """
 }
@@ -237,9 +239,9 @@ workflow {
     vcf_dir = GtcToVcf( csv_manifest, bmp_manifest, reference_fa, reference_fa_index, gtc_dir )
     
     indexed_vcf_dir = indexVCF( vcf_dir )
-    merged_bcf = mergeVCF( indexed_vcf_dir )
-    filtered_bcf = filterBCF( merged_bcf )
-    genotypes = createGenotypeFrame( filtered_bcf )
-
-    refineGenotypeFrame( genotypes.frame, sample_sheet )
+    merged_vcf = mergeVCF( indexed_vcf_dir )
+    filtered_merged_vcf = filterVCF( merged_vcf )
+    
+    genotypes = extractGenotypes( filtered_merged_vcf )
+    refineGenotypeFrame( genotypes.traw, sample_sheet )
 }
