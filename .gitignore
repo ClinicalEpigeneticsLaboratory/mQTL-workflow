@@ -1,5 +1,6 @@
 # Nextflow cache
 work/
+reports/
 .nextflow*
 
 # Raw data
