@@ -76,7 +76,7 @@ def analyse(chr_: str,
     snps_positions_per_chr = gsa_map[chr_]
     cpgs_positions_per_chr = methylation_map[chr_]
 
-    for snpID in tqdm(snps_positions_per_chr.index[:100]):
+    for snpID in tqdm(snps_positions_per_chr.index):
         snp_pos = snps_positions_per_chr.loc[snpID, "MAPINFO"]
         snp_data = genotype_frame.loc[snpID]
         
