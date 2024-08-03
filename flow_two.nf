@@ -102,7 +102,7 @@ process processIDATs {
     """
 }
 
-process renameSamples {
+process refineMynorm {
     publishDir "$params.results_dir/flow_two", mode: 'copy', overwrite: true, pattern: 'mynorm.parquet'
 
     input:
@@ -115,7 +115,7 @@ process renameSamples {
     script:
     """
 
-    rename_samples.py $mynorm $sample_sheet ${params.array_position} ${params.sample_name}
+    refine_mynorm.py $mynorm $sample_sheet ${params.array_position} ${params.sample_name}
 
     """
 }
@@ -150,7 +150,7 @@ workflow {
     // Workflow
     prepared_idats = prepareIDATs( methylation_idats_dir, sample_sheet )
     mynorm = processIDATs( prepared_idats )
-    mynorm = renameSamples( mynorm, sample_sheet )
+    mynorm = refineMynorm( mynorm, sample_sheet )
 
     if ( params.correction == true ) {
         mynorm = CellFractionCorrection( mynorm )

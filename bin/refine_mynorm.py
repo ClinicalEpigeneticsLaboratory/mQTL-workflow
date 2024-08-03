@@ -41,4 +41,4 @@ if __name__ == "__main__":
     mynorm = recode_sample_names(
         mynorm, sample_sheet, array_position_col, sample_name_col
     )
-    mynorm.to_parquet(f"mynorm.parquet")
+    mynorm.dropna().to_parquet(f"mynorm.parquet")

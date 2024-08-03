@@ -41,9 +41,6 @@ mynorm <- read_parquet(mynorm_input) %>% as.data.frame()
 rownames(mynorm) <- mynorm$CpG
 mynorm$CpG <- NULL
 
-mynorm <- na.omit(mynorm)
-print(head(mynorm))
-print(dim(mynorm))
 results <- modified_refBase(mynorm)
 
 corrected_mynorm <- as.data.frame(results$CorrectedBeta)
