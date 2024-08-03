@@ -6,7 +6,7 @@ from multiprocessing import Pool
 
 import pandas as pd
 from tqdm import tqdm
-import scipy.stats as sts
+import statsmodels.api as sms
 from statsmodels.stats.multitest import fdrcorrection
 
 
@@ -23,7 +23,6 @@ def generate_gsa_map(
         list(set(manifest.index).intersection(set(genomic_frame.index)))
     ]
 
-    print(manifest)
     manifest.columns = ["CHR", "MAPINFO"]
     manifest["MAPINFO"] = manifest["MAPINFO"].astype(int)
 
@@ -62,56 +61,64 @@ def encode(values: pd.Series) -> dict[str, int]:
     return dict(zip(order, numerical))
 
 
-def analyse(chr_):
+def analyse(chr_: str, 
+            min_distance: int,
+            max_distance: int, 
+            gsa_map: dict[str, pd.DataFrame], 
+            methylation_map: dict[str, pd.DataFrame], 
+            genotype_frame: pd.DataFrame, 
+            methylation_frame: pd.DataFrame, 
+            sample_sheet: pd.DataFrame, 
+            covariates: list[str]
+           ) -> pd.DataFrame:
+
     stats = []
-    print(methylation_map.keys())
-    
     snps_positions_per_chr = gsa_map[chr_]
     cpgs_positions_per_chr = methylation_map[chr_]
 
-    for snpID in tqdm(snps_positions_per_chr.index):
+    for snpID in tqdm(snps_positions_per_chr.index[:100]):
         snp_pos = snps_positions_per_chr.loc[snpID, "MAPINFO"]
         snp_data = genotype_frame.loc[snpID]
-
+        
         mapper = encode(snp_data)
         snp_data = snp_data.map(mapper)
 
-        cpgs_in_range = cpgs_positions_per_chr["MAPINFO"] - snp_pos
-        cpgs_in_range = cpgs_in_range[
-            cpgs_in_range.abs() <= int(distance)
-        ].index.tolist()
+        cpgs_in_range = cpgs_positions_per_chr.loc[
+            (cpgs_positions_per_chr["MAPINFO"] - snp_pos).abs().between(int(min_distance), int(max_distance))
+        ]
 
-        if not cpgs_in_range:
+        if cpgs_in_range.empty:
             continue
 
-        cpgs_in_range = methylation_frame.loc[cpgs_in_range]
+        cpg_data_in_range = methylation_frame.loc[cpgs_in_range.index]
+        exog_data = pd.concat((sample_sheet, snp_data), axis=1, join="inner")
 
-        for cpg, cpg_data in cpgs_in_range.iterrows():
-            cpg_pos = cpgs_positions_per_chr.loc[cpg, "MAPINFO"]
+        for cpg in cpg_data_in_range.index:
+            cpg_data = cpg_data_in_range.loc[cpg]
+            model = sms.RLM(cpg_data, exog_data, M=sms.robust.norms.HuberT()).fit()
+            
+            slope = model.params.get(snpID)
+            pval = model.pvalues.get(snpID)
 
-            model = sts.linregress(x=snp_data, y=cpg_data)
-            slope, r, pval = model.slope, model.rvalue, model.pvalue
             stats.append(
                 {
                     "CHR": chr_,
                     "snp": snpID,
                     "snp POS": snp_pos,
                     "cpg": cpg,
-                    "cpg POS": cpg_pos,
-                    "slope": abs(slope),
-                    "R2": r**2,
-                    "p-value": pval
+                    "cpg POS": cpgs_positions_per_chr.loc[cpg, "MAPINFO"],
+                    "|slope|": abs(slope),
+                    "p-value": pval,
+                    "n": len(common_samples),
+                    "Model": f"{cpg} ~ {' + '.join(exog_data.columns)}"
                 }
             )
 
     data = pd.DataFrame(stats)
     _, data["FDR"] = fdrcorrection(data["p-value"], method="n")
-    
-    data["distance"] = data["snp POS"] - data["cpg POS"]
-    data.distance = data.distance.abs()
+    data["distance"] = (data["snp POS"] - data["cpg POS"]).abs()
 
     return data
-
 
 if __name__ == "__main__":
     (
@@ -120,7 +127,11 @@ if __name__ == "__main__":
         gsa_manifest,
         methylation_manifest,
         conversion_file,
-        distance,
+        sample_sheet,
+        sample_name,
+        covariates,
+        min_distance,
+        max_distance,
         nCPU,
     ) = sys.argv[1:]
 
@@ -133,14 +144,17 @@ if __name__ == "__main__":
     GSA manifest: {gsa_manifest}
     Methylation manifest: {methylation_manifest}
     Conversion file: {conversion_file}
-
+    Sample sheet file: {sample_sheet}
+    Sample name column: {sample_name}
+    Co-variates: {covariates}
+    
     OPTIONS:
     =================================
-    Distance threshold [bp]: {distance}
+    Min distance threshold [bp]: {min_distance}
+    Max distance threshold [bp]: {max_distance}
     CPUs: {nCPU}
     """
     )
-
     methylation_frame = pd.read_parquet(methylation_frame)
     if "CpG" in methylation_frame.columns:
         methylation_frame = methylation_frame.set_index("CpG")
@@ -155,9 +169,31 @@ if __name__ == "__main__":
     common_samples = list(set.intersection(set(methylation_frame.columns), set(genotype_frame.columns)))
     genotype_frame = genotype_frame[common_samples]
     methylation_frame = methylation_frame[common_samples]
+
+    sample_sheet = pd.read_csv(sample_sheet).set_index(sample_name)
+    sample_sheet = sample_sheet.loc[common_samples]
+    sample_sheet.insert(loc=0, column="Intercept", value=1)
+
+    if covariates:
+        covariates = [covar.strip() for covar in covariates.split(",")]
+        sample_sheet = sample_sheet[["Intercept", *covariates]]
+
+    else:
+        sample_sheet = sample_sheet[["Intercept"]]
+    
+    f = partial(analyse, 
+                      min_distance=min_distance, 
+                      max_distance=max_distance, 
+                      gsa_map=gsa_map, 
+                      methylation_map=methylation_map, 
+                      genotype_frame=genotype_frame, 
+                      methylation_frame=methylation_frame, 
+                      sample_sheet=sample_sheet, 
+                      covariates=covariates
+                     )
     
     with Pool(int(nCPU)) as p:
-        results = p.map(analyse, gsa_map.keys())
+        results = p.map(f, gsa_map.keys())
 
     results = pd.concat(results)
     

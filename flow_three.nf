@@ -7,10 +7,15 @@ params.results_dir = ''
 params.csv_gsa_manifest = ''
 params.csv_methylation_manifest = ''
 params.conversion_file = ''
+params.sample_sheet = ''
+params.sample_name = 'Sample_Name'
+params.covars = ''
 
 params.vep_annotations = false
 params.genome_assembly = "GRCh37"
-params.distance = 250000
+
+params.min_distance = 0
+params.max_distance = 250000
 params.alpha = 0.05
 params.slope = 0.05
 
@@ -32,12 +37,17 @@ log.info """\
             Methylation manifest [--csv_methylation_manifest <path>]: ${params.csv_methylation_manifest}
             Conversion file [--conversion_file <path>]: ${params.conversion_file}
             Genome assembly [--genome_assembly <str>]: ${params.genome_assembly} [default: GRCh37]
+            Sample sheet [--sample_sheet <path>]: ${params.sample_sheet}
+            Sample name column [--sample_name <str>]: ${params.sample_name} [default: Sample_Name]
             Number of CPUs [--CPUs <int>]: ${params.CPUs} [default: 10]
 
             mQTL config:
+            ==============
             Alpha [--alpha <float>]: ${params.alpha} [default: 0.05]
             Slope [--slope <float>]: ${params.slope} [default: 0.05]
-            Distance [--distance <int>]: ${params.distance} [default: 250000]
+            Minimum distance [--min_distance <int>]: ${params.min_distance} [default: 0]
+            Maximum distance [--max_distance <int>]: ${params.max_distance} [default: 250000]
+            Model covariates [--covars list[<str>]]: ${params.covars}
 
             PLINK config:
             ==============
@@ -64,6 +74,7 @@ process validateParams {
     path mynorm
     path genotype_table
     path vcf
+    path sample_sheet
 
     script:
     """
@@ -78,7 +89,7 @@ process validateParams {
     assert ${params.CPUs} <= cpus_available, f"Exceeded number of available cpus --> {${params.CPUs}} / {cpus_available}" 
 
     # Files flags check
-    files = ["$csv_gsa_manifest", "$csv_methylation_manifest", "$conversion_file", "$mynorm", "$genotype_table", "$vcf"]
+    files = ["$csv_gsa_manifest", "$csv_methylation_manifest", "$conversion_file", "$mynorm", "$genotype_table", "$vcf", "$sample_sheet"]
     for file in files:
         assert os.path.exists(file), f"File does not exists {file}"
     
@@ -88,6 +99,23 @@ process validateParams {
     # VEP flag check 
     assert "${params.vep_annotations}" in ["true", "false"], f"--vep_annotations should be either true or false, is ${params.vep_annotations}"
 
+    # Distance
+    assert int(${params.min_distance}) >= 0, "Min distance should be >= 0"
+    assert int(${params.max_distance}) > int(${params.min_distance}), "Max distance <= min distance between SNP and CpG"
+
+    # Sample sheet
+    ss = pd.read_csv("$sample_sheet")
+    assert "${params.sample_name}" in ss, "Sample Name not in sample sheet"
+
+    if "${params.covars}":
+        covars = [covar.strip() for covar in "${params.covars}".split(",")]
+        for covar in covars:
+            assert covar in ss.columns, f"{covar} not available in sample sheet"
+
+        try:
+            ss[covars].astype(float)
+        except ValueError:
+            raise Exception("Sample sheet should contain only numerical values!")
     """
 }
 
@@ -100,6 +128,7 @@ process identifyMQTLs {
     path csv_gsa_manifest
     path csv_methylation_manifest
     path conversion_file
+    path sample_sheet
 
     output:
     path 'mQTL.parquet'
@@ -107,7 +136,10 @@ process identifyMQTLs {
     script:
     """
 
-    mqtl.py $genotype_table $mynorm $csv_gsa_manifest $csv_methylation_manifest $conversion_file ${params.distance} ${params.CPUs}
+    mqtl.py $genotype_table $mynorm $csv_gsa_manifest \
+    $csv_methylation_manifest $conversion_file $sample_sheet \
+    ${params.sample_name} ${params.covars} ${params.min_distance} \
+    ${params.max_distance} ${params.CPUs}
     
     """
 }
@@ -134,13 +166,13 @@ process filterMQTLs {
 
     mqtl = pd.read_parquet("$mqtls")
     mqtl[["cpg", "FDR"]].rename({"cpg": "CpG", "FDR": "P"}, axis=1).groupby("CpG").min().to_csv("cpg_pval.txt", sep="\t")
-    mqtl[["snp", "FDR"]].rename({"snp": "SNP", "FDR": "P"}, axis=1).groupby("SNP").min().to_csv("rs_pval.txt", sep="\t")
+    mqtl[["RsID", "FDR"]].rename({"RsID": "SNP", "FDR": "P"}, axis=1).groupby("RsID").min().to_csv("rs_pval.txt", sep="\t")
 
     filtered = mqtl[(mqtl.slope >= float(${params.slope})) & (mqtl.FDR <= float(${params.alpha}))]
     filtered.to_parquet("filtered_mQTL.parquet")
 
     filtered.cpg.drop_duplicates().to_csv("cpg_list.txt", index=False, header=None, sep="\t")
-    filtered.snp.drop_duplicates().to_csv("rs_list.txt", index=False, header=None, sep="\t")
+    filtered.RsID.drop_duplicates().to_csv("rs_list.txt", index=False, header=None, sep="\t")
 
     """
 }
@@ -252,22 +284,23 @@ workflow {
     csv_gsa_manifest = file(params.csv_gsa_manifest)
     csv_methylation_manifest = file(params.csv_methylation_manifest)
     conversion_file = file(params.conversion_file)
+    sample_sheet = file(params.sample_sheet)
 
     mynorm = loadMynorm( params.results_dir )
     genotype_table = loadGenotypeFrame( params.results_dir )
     vcf = loadVCF( params.results_dir )
 
     // Validate params
-    validateParams( csv_gsa_manifest, csv_methylation_manifest, conversion_file, mynorm, genotype_table, vcf )
+    validateParams( csv_gsa_manifest, csv_methylation_manifest, conversion_file, mynorm, genotype_table, vcf, sample_sheet )
 
     // Workflow
-    mqtls = identifyMQTLs( genotype_table, mynorm, csv_gsa_manifest, csv_methylation_manifest, conversion_file )
+    mqtls = identifyMQTLs( genotype_table, mynorm, csv_gsa_manifest, csv_methylation_manifest, conversion_file, sample_sheet )
     filtered_data = filterMQTLs( mqtls )
     
     beds = exportBEDfiles( mqtls )
     beds.snp.mix(beds.cpg).set { combinedChannel }
 
-    runHomer ( combinedChannel )
+    runHomer( combinedChannel )
     anotateSNPs( vcf, filtered_data.rs_list )
     clumping( vcf, filtered_data.rs_pval_list )
 }
