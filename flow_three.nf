@@ -166,9 +166,9 @@ process filterMQTLs {
 
     mqtl = pd.read_parquet("$mqtls")
     mqtl[["cpg", "FDR"]].rename({"cpg": "CpG", "FDR": "P"}, axis=1).groupby("CpG").min().to_csv("cpg_pval.txt", sep="\t")
-    mqtl[["RsID", "FDR"]].rename({"RsID": "SNP", "FDR": "P"}, axis=1).groupby("RsID").min().to_csv("rs_pval.txt", sep="\t")
+    mqtl[["RsID", "FDR"]].rename({"RsID": "SNP", "FDR": "P"}, axis=1).groupby("SNP").min().to_csv("rs_pval.txt", sep="\t")
 
-    filtered = mqtl[(mqtl.slope >= float(${params.slope})) & (mqtl.FDR <= float(${params.alpha}))]
+    filtered = mqtl[(mqtl["|slope|"] >= float(${params.slope})) & (mqtl.FDR <= float(${params.alpha}))]
     filtered.to_parquet("filtered_mQTL.parquet")
 
     filtered.cpg.drop_duplicates().to_csv("cpg_list.txt", index=False, header=None, sep="\t")
@@ -208,7 +208,6 @@ process exportBEDfiles {
     tuple val('SNP'), path('snpInput.bed'), path('snpBg.bed'), emit: snp
     tuple val('CpG'), path('cpgInput.bed'), path('cpgBg.bed'), emit: cpg
 
-
     script:
     """
     #!/usr/bin/python3
@@ -225,7 +224,7 @@ process exportBEDfiles {
     snp["start"] = snp["snp POS"] - 1
     snp[["CHR", "start", "snp POS", "snp"]].drop_duplicates().sort_values(["CHR", "start"]).to_csv(f"snpBg.bed", index=False, header=None, sep="\t")
 
-    mqtl = mqtl[(mqtl.slope >= float(${params.slope})) & (mqtl.FDR <= float(${params.alpha}))]
+    mqtl = mqtl[(mqtl["|slope|"] >= float(${params.slope})) & (mqtl.FDR <= float(${params.alpha}))]
 
     cpg = mqtl[["CHR", "cpg", "cpg POS"]]
     cpg["start"] = cpg["cpg POS"] - 1
