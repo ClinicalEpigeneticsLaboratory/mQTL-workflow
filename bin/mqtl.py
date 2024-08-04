@@ -97,10 +97,16 @@ def annotate(
     methylation_manifest: str,
 ) -> pd.DataFrame:
     conversion_file = pd.read_table(conversion_file).set_index("Name")
-    gsa_manifest = pd.read_csv(gsa_manifest, skiprows=7, low_memory=False).set_index("Name")
-    methylation_manifest = pd.read_csv(methylation_manifest, skiprows=7, low_memory=False).set_index("Name")
+    gsa_manifest = pd.read_csv(gsa_manifest, skiprows=7, low_memory=False).set_index(
+        "Name"
+    )
+    methylation_manifest = pd.read_csv(
+        methylation_manifest, skiprows=7, low_memory=False
+    ).set_index("Name")
 
-    mqtls = pd.merge(mqtls, conversion_file, how="left", left_on="snp", right_index=True)
+    mqtls = pd.merge(
+        mqtls, conversion_file, how="left", left_on="snp", right_index=True
+    )
     mqtls = pd.merge(
         mqtls,
         gsa_manifest.rename({"MapInfo": "snp pos"}, axis=1)["snp pos"],
@@ -120,13 +126,7 @@ def annotate(
     return mqtls
 
 
-def analyse(
-    chr_: str,
-    interactions_map: dict,
-    genotype_frame: pd.DataFrame,
-    methylation_frame: pd.DataFrame,
-    sample_sheet: pd.DataFrame,
-) -> pd.DataFrame:
+def analyse(chr_: str) -> pd.DataFrame:
     stats = []
 
     interactions = interactions_map[chr_]
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     ) = sys.argv[1:]
 
     print(
-    f"""
+        f"""
     INPUT:
     =================================
     Processing genotype frame file: {genotype_frame}
@@ -229,16 +229,8 @@ if __name__ == "__main__":
     else:
         sample_sheet = sample_sheet[["Intercept"]]
 
-    f = partial(
-        analyse,
-        interactions_map=interactions_map,
-        genotype_frame=genotype_frame,
-        methylation_frame=methylation_frame,
-        sample_sheet=sample_sheet,
-    )
-
     with Pool(int(nCPU)) as p:
-        results = p.map(f, gsa_map.keys())
+        results = p.map(analyse, gsa_map.keys())
 
     results = pd.concat(results)
     results = annotate(results, conversion_file, gsa_manifest, methylation_manifest)
