@@ -14,10 +14,10 @@ def generate_gsa_map(
     manifest: str, genomic_frame: pd.DataFrame
 ) -> dict[str, pd.DataFrame]:
     map = {}
-    
+
     manifest = pd.read_csv(manifest, skiprows=7, low_memory=False)
     manifest = manifest[["Name", "Chr", "MapInfo"]]
-    
+
     manifest = manifest.dropna().set_index("Name")
     manifest = manifest.loc[
         list(set(manifest.index).intersection(set(genomic_frame.index)))
@@ -54,71 +54,113 @@ def generate_methylation_map(
     return map
 
 
+def generate_interaction_map(
+    gsa_map: dict, methylation_map: dict, min_distance: int, max_distance: int
+) -> dict:
+    map = {}
+    for chr in gsa_map.keys():
+        map_per_chr = []
+        snps_positions_per_chr = gsa_map[chr]
+        cpgs_positions_per_chr = methylation_map[chr]
+
+        for snpID in tqdm(snps_positions_per_chr.index, desc=chr):
+            snp_pos = snps_positions_per_chr.loc[snpID, "MAPINFO"]
+            cpgs_in_range = cpgs_positions_per_chr.loc[
+                (cpgs_positions_per_chr["MAPINFO"] - snp_pos)
+                .abs()
+                .between(int(min_distance), int(max_distance))
+            ]
+
+            if cpgs_in_range.empty:
+                continue
+
+            for cpgID in cpgs_in_range.index:
+                map_per_chr.append([snpID, cpgID])
+
+        map[chr] = map_per_chr
+
+    return map
+
+
 def encode(values: pd.Series) -> dict[str, int]:
     order = sorted(values.unique())
     numerical = list(range(len(order)))
 
-    return dict(zip(order, numerical))
+    mapper = dict(zip(order, numerical))
+    return values.map(mapper)
 
 
-def analyse(chr_: str, 
-            min_distance: int,
-            max_distance: int, 
-            gsa_map: dict[str, pd.DataFrame], 
-            methylation_map: dict[str, pd.DataFrame], 
-            genotype_frame: pd.DataFrame, 
-            methylation_frame: pd.DataFrame, 
-            sample_sheet: pd.DataFrame, 
-            covariates: list[str]
-           ) -> pd.DataFrame:
+def annotate(
+    mqtls: pd.DataFrame,
+    conversion_file: str,
+    gsa_manifest: str,
+    methylation_manifest: str,
+) -> pd.DataFrame:
+    conversion_file = pd.read_table(conversion_file).set_index("Name")
+    gsa_manifest = pd.read_csv(gsa_manifest, skiprows=7, low_memory=False).set_index("Name")
+    methylation_manifest = pd.read_csv(methylation_manifest, skiprows=7, low_memory=False).set_index("Name")
 
+    mqtls = pd.merge(mqtls, conversion_file, how="left", left_on="snp", right_index=True)
+    mqtls = pd.merge(
+        mqtls,
+        gsa_manifest.rename({"MapInfo": "snp pos"}, axis=1)["snp pos"],
+        how="left",
+        left_on="snp",
+        right_index=True,
+    )
+    mqtls = pd.merge(
+        mqtls,
+        methylation_manifest.rename({"MAPINFO": "cpg pos"}, axis=1)["cpg pos"],
+        how="left",
+        left_on="cpg",
+        right_index=True,
+    )
+
+    mqtls["|distance|"] = (mqtls["snp pos"] - mqtls["cpg pos"]).abs()
+    return mqtls
+
+
+def analyse(
+    chr_: str,
+    interactions_map: dict,
+    genotype_frame: pd.DataFrame,
+    methylation_frame: pd.DataFrame,
+    sample_sheet: pd.DataFrame,
+) -> pd.DataFrame:
     stats = []
-    snps_positions_per_chr = gsa_map[chr_]
-    cpgs_positions_per_chr = methylation_map[chr_]
 
-    for snpID in tqdm(snps_positions_per_chr.index):
-        snp_pos = snps_positions_per_chr.loc[snpID, "MAPINFO"]
-        snp_data = genotype_frame.loc[snpID]
-        
-        mapper = encode(snp_data)
-        snp_data = snp_data.map(mapper)
+    interactions = interactions_map[chr_]
+    rss = list(set([inter[0] for inter in interactions]))
+    cpgs = list(set([inter[1] for inter in interactions]))
 
-        cpgs_in_range = cpgs_positions_per_chr.loc[
-            (cpgs_positions_per_chr["MAPINFO"] - snp_pos).abs().between(int(min_distance), int(max_distance))
-        ]
+    data = pd.concat(
+        (genotype_frame.T[rss], methylation_frame.T[cpgs], sample_sheet),
+        axis=1,
+        join="inner",
+    )
 
-        if cpgs_in_range.empty:
-            continue
+    for snpID, cpgID in tqdm(interactions):
+        exog = [*sample_sheet.columns.tolist(), snpID]
+        model = sms.RLM(data[cpgID], data[exog], M=sms.robust.norms.HuberT()).fit()
 
-        cpg_data_in_range = methylation_frame.loc[cpgs_in_range.index]
-        exog_data = pd.concat((sample_sheet, snp_data), axis=1, join="inner")
+        slope = model.params.loc[snpID]
+        pval = model.pvalues.loc[snpID]
 
-        for cpg in cpg_data_in_range.index:
-            cpg_data = cpg_data_in_range.loc[cpg]
-            model = sms.RLM(cpg_data, exog_data, M=sms.robust.norms.HuberT()).fit()
-            
-            slope = model.params.get(snpID)
-            pval = model.pvalues.get(snpID)
-
-            stats.append(
-                {
-                    "CHR": chr_,
-                    "snp": snpID,
-                    "snp POS": snp_pos,
-                    "cpg": cpg,
-                    "cpg POS": cpgs_positions_per_chr.loc[cpg, "MAPINFO"],
-                    "|slope|": abs(slope),
-                    "p-value": pval,
-                    "n": len(common_samples),
-                    "Model": f"{cpg} ~ {' + '.join(exog_data.columns)}"
-                }
-            )
+        stats.append(
+            {
+                "CHR": chr_,
+                "snp": snpID,
+                "cpg": cpgID,
+                "|slope|": abs(slope),
+                "p-value": pval,
+                "Model": f"{cpgID} ~ {' + '.join(exog)}",
+            }
+        )
 
     data = pd.DataFrame(stats)
     _, data["FDR"] = fdrcorrection(data["p-value"], method="n")
-    data["distance"] = (data["snp POS"] - data["cpg POS"]).abs()
-
     return data
+
 
 if __name__ == "__main__":
     (
@@ -162,11 +204,17 @@ if __name__ == "__main__":
     genotype_frame = pd.read_parquet(genotype_frame)
     if "SNP" in genotype_frame.columns:
         genotype_frame = genotype_frame.set_index("SNP")
+    genotype_frame = genotype_frame.apply(encode, axis=1)
 
     methylation_map = generate_methylation_map(methylation_manifest, methylation_frame)
     gsa_map = generate_gsa_map(gsa_manifest, genotype_frame)
+    interactions_map = generate_interaction_map(
+        gsa_map, methylation_map, min_distance, max_distance
+    )
 
-    common_samples = list(set.intersection(set(methylation_frame.columns), set(genotype_frame.columns)))
+    common_samples = list(
+        set.intersection(set(methylation_frame.columns), set(genotype_frame.columns))
+    )
     genotype_frame = genotype_frame[common_samples]
     methylation_frame = methylation_frame[common_samples]
 
@@ -180,24 +228,18 @@ if __name__ == "__main__":
 
     else:
         sample_sheet = sample_sheet[["Intercept"]]
-    
-    f = partial(analyse, 
-                      min_distance=min_distance, 
-                      max_distance=max_distance, 
-                      gsa_map=gsa_map, 
-                      methylation_map=methylation_map, 
-                      genotype_frame=genotype_frame, 
-                      methylation_frame=methylation_frame, 
-                      sample_sheet=sample_sheet, 
-                      covariates=covariates
-                     )
-    
+
+    f = partial(
+        analyse,
+        interactions_map=interactions_map,
+        genotype_frame=genotype_frame,
+        methylation_frame=methylation_frame,
+        sample_sheet=sample_sheet,
+    )
+
     with Pool(int(nCPU)) as p:
         results = p.map(f, gsa_map.keys())
 
     results = pd.concat(results)
-    
-    conversion_file = pd.read_table(conversion_file).set_index("Name")
-    results = pd.merge(conversion_file, results, how="right", left_index=True, right_on="snp")
-    
+    results = annotate(results, conversion_file, gsa_manifest, methylation_manifest)
     results.to_parquet("mQTL.parquet")
