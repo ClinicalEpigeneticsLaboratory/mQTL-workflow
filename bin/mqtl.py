@@ -1,7 +1,6 @@
 #!/usr/bin/python3.10
 
 import sys
-from functools import partial
 from multiprocessing import Pool
 
 import pandas as pd
