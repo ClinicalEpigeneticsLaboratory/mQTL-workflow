@@ -153,10 +153,9 @@ process filterMQTLs {
 
     output:
     path 'filtered_mQTL.parquet', emit: mqtl_filtered
-    path 'cpg_list.txt', emit: cpg_list
     path 'cpg_pval.txt', emit: cpg_pval_list
-    path 'rs_list.txt', emit: rs_list
     path 'rs_pval.txt', emit: rs_pval_list
+    path 'snp_list.txt', emit: snp_list
 
     script:
     """
@@ -171,8 +170,8 @@ process filterMQTLs {
     filtered = mqtl[(mqtl["|slope|"] >= float(${params.slope})) & (mqtl.FDR <= float(${params.alpha}))]
     filtered.to_parquet("filtered_mQTL.parquet")
 
-    filtered.cpg.drop_duplicates().to_csv("cpg_list.txt", index=False, header=None, sep="\t")
-    filtered.RsID.drop_duplicates().to_csv("rs_list.txt", index=False, header=None, sep="\t")
+    # Raw SNPs [Illumina probes] not RSids! To make this list consistent with VCF file!
+    filtered.snp.drop_duplicates().to_csv("snp_list.txt", index=False, header=None, sep="\t")
 
     """
 }
@@ -183,7 +182,7 @@ process anotateSNPs {
 
     input:
     path vcf
-    path rs_list
+    path snp_list
 
     output:
     path 'vep_report*'
@@ -192,7 +191,7 @@ process anotateSNPs {
     script:
     """
 
-    bcftools view -i 'ID=@$rs_list' --threads ${params.CPUs} -O z -o mQTL.vcf.gz $vcf
+    bcftools view -i 'ID=@$snp_list' --threads ${params.CPUs} -O z -o mQTL.vcf.gz $vcf
     vep -i mQTL.vcf.gz -o vep_report --assembly ${params.genome_assembly} --cache --offline --fork ${params.CPUs} --dir_cache "/usr/local/.vep"
 
     """
@@ -240,13 +239,13 @@ process exportBEDfiles {
 
 
 process runHomer {
-    publishDir "$params.results_dir/flow_three", mode: 'copy', overwrite: true, pattern: '*_homer.html'
+    publishDir "$params.results_dir/flow_three", mode: 'copy', overwrite: true, pattern: '*_homer.*'
 
     input:
     tuple val(type), path(input), path(bg)
 
     output:
-    path '*_homer.html'
+    path '*_homer.*'
 
     script:
     """
@@ -257,6 +256,7 @@ process runHomer {
     fi
 
     cp homer/$type/knownResults.html $type"_homer.html"
+    cp homer/$type/knownResults.txt $type"_homer.txt"
     """
 }
 
@@ -301,6 +301,6 @@ workflow {
     beds.snp.mix(beds.cpg).set { combinedChannel }
 
     runHomer( combinedChannel )
-    anotateSNPs( vcf, filtered_data.rs_list )
+    anotateSNPs( vcf, filtered_data.snp_list )
     clumping( vcf, filtered_data.rs_pval_list )
 }
