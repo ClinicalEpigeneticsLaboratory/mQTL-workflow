@@ -58,6 +58,7 @@ def generate_interaction_map(
     gsa_map: dict, methylation_map: dict, min_distance: int, max_distance: int
 ) -> dict:
     map = {}
+    
     for chr in gsa_map.keys():
         map_per_chr = []
         snps_positions_per_chr = gsa_map[chr]
@@ -126,25 +127,29 @@ def annotate(
     return mqtls
 
 
-def analyse(chr_: str) -> pd.DataFrame:
+def prepare_chunks(interactions_map: dict, genotype_frame: pd.DataFrame, methylation_frame: pd.DataFrame, sample_sheet) -> list:
+    chunks = []
+    for chr_ in [f"chr{i+1}" for i in range(22)]:
+        interactions = interactions_map[chr_]
+
+        rss = list({x[0] for x in interactions})
+        cpgs = list({x[1] for x in interactions})
+        
+        chunks.append([chr_, interactions, genotype_frame.loc[rss], methylation_frame.loc[cpgs], sample_sheet])
+
+    return chunks
+
+
+def analyse(data: list) -> pd.DataFrame:
+    chr_, interactions, genotype_frame, methylation_frame, sample_sheet = data
     stats = []
-
-    interactions = interactions_map[chr_]
-    rss = list(set([inter[0] for inter in interactions]))
-    cpgs = list(set([inter[1] for inter in interactions]))
-
-    data = pd.concat(
-        (genotype_frame.T[rss], methylation_frame.T[cpgs], sample_sheet),
-        axis=1,
-        join="inner",
-    )
-
+    
     for snpID, cpgID in tqdm(interactions):
-        exog = [*sample_sheet.columns.tolist(), snpID]
-        model = sms.RLM(data[cpgID], data[exog], M=sms.robust.norms.HuberT()).fit()
+        exog = pd.concat((genotype_frame.loc[snpID], sample_sheet), axis=1)
+        model = sms.RLM(methylation_frame.loc[cpgID], exog, M=sms.robust.norms.HuberT()).fit()
 
-        slope = model.params.loc[snpID]
-        pval = model.pvalues.loc[snpID]
+        slope = model.params[snpID]
+        pval = model.pvalues[snpID]
 
         stats.append(
             {
@@ -153,7 +158,7 @@ def analyse(chr_: str) -> pd.DataFrame:
                 "cpg": cpgID,
                 "|slope|": abs(slope),
                 "p-value": pval,
-                "Model": f"{cpgID} ~ {' + '.join(exog)}",
+                "Model": f"{cpgID} ~ {' + '.join([*sample_sheet.columns.tolist(), snpID])}",
             }
         )
 
@@ -178,7 +183,7 @@ if __name__ == "__main__":
     ) = sys.argv[1:]
 
     print(
-        f"""
+    f"""
     INPUT:
     =================================
     Processing genotype frame file: {genotype_frame}
@@ -212,13 +217,13 @@ if __name__ == "__main__":
         gsa_map, methylation_map, min_distance, max_distance
     )
 
+    sample_sheet = pd.read_csv(sample_sheet).set_index(sample_name)
     common_samples = list(
-        set.intersection(set(methylation_frame.columns), set(genotype_frame.columns))
+        set.intersection(set(methylation_frame.columns), set(genotype_frame.columns), set(sample_sheet.index))
     )
+    
     genotype_frame = genotype_frame[common_samples]
     methylation_frame = methylation_frame[common_samples]
-
-    sample_sheet = pd.read_csv(sample_sheet).set_index(sample_name)
     sample_sheet = sample_sheet.loc[common_samples]
     sample_sheet.insert(loc=0, column="Intercept", value=1)
 
@@ -229,9 +234,12 @@ if __name__ == "__main__":
     else:
         sample_sheet = sample_sheet[["Intercept"]]
 
+    chunks = prepare_chunks(interactions_map, genotype_frame, methylation_frame, sample_sheet)
     with Pool(int(nCPU)) as p:
-        results = p.map(analyse, gsa_map.keys())
+        results = p.map(analyse, chunks)
 
     results = pd.concat(results)
+    results = results.reset_index(drop=True)
+    
     results = annotate(results, conversion_file, gsa_manifest, methylation_manifest)
     results.to_parquet("mQTL.parquet")
