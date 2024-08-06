@@ -15,7 +15,7 @@ params.vep_annotations = false
 params.genome_assembly = "GRCh37"
 
 params.min_distance = 0
-params.max_distance = 250000
+params.max_distance = 100000
 params.alpha = 0.05
 params.slope = 0.05
 
@@ -46,7 +46,7 @@ log.info """\
             Alpha [--alpha <float>]: ${params.alpha} [default: 0.05]
             Slope [--slope <float>]: ${params.slope} [default: 0.05]
             Minimum distance [--min_distance <int>]: ${params.min_distance} [default: 0]
-            Maximum distance [--max_distance <int>]: ${params.max_distance} [default: 250000]
+            Maximum distance [--max_distance <int>]: ${params.max_distance} [default: 100000]
             Model covariates [--covars list[<str>]]: ${params.covars}
 
             PLINK config:
@@ -215,24 +215,25 @@ process exportBEDfiles {
     import pandas as pd 
 
     mqtl = pd.read_parquet("$mqtl")
+    mqtl[["cpg pos", "snp pos"]] = mqtl[["cpg pos", "snp pos"]].astype(int)
 
-    cpg = mqtl[["CHR", "cpg", "cpg POS"]]
-    cpg["start"] = cpg["cpg POS"] - 1
-    cpg[["CHR", "start", "cpg POS", "cpg"]].drop_duplicates().sort_values(["CHR", "start"]).to_csv(f"cpgBg.bed", index=False, header=None, sep="\t")
+    cpg = mqtl[["CHR", "cpg", "cpg pos"]]
+    cpg["start"] = cpg["cpg pos"] - 1
+    cpg[["CHR", "start", "cpg pos", "cpg"]].drop_duplicates().sort_values(["CHR", "start"]).to_csv(f"cpgBg.bed", index=False, header=None, sep="\t")
 
-    snp = mqtl[["CHR", "snp", "snp POS"]]
-    snp["start"] = snp["snp POS"] - 1
-    snp[["CHR", "start", "snp POS", "snp"]].drop_duplicates().sort_values(["CHR", "start"]).to_csv(f"snpBg.bed", index=False, header=None, sep="\t")
+    snp = mqtl[["CHR", "snp", "snp pos"]]
+    snp["start"] = snp["snp pos"] - 1
+    snp[["CHR", "start", "snp pos", "snp"]].drop_duplicates().sort_values(["CHR", "start"]).to_csv(f"snpBg.bed", index=False, header=None, sep="\t")
 
     mqtl = mqtl[(mqtl["|slope|"] >= float(${params.slope})) & (mqtl.FDR <= float(${params.alpha}))]
 
-    cpg = mqtl[["CHR", "cpg", "cpg POS"]]
-    cpg["start"] = cpg["cpg POS"] - 1
-    cpg[["CHR", "start", "cpg POS", "cpg"]].drop_duplicates().sort_values(["CHR", "start"]).to_csv(f"cpgInput.bed", index=False, header=None, sep="\t")
+    cpg = mqtl[["CHR", "cpg", "cpg pos"]]
+    cpg["start"] = cpg["cpg pos"] - 1
+    cpg[["CHR", "start", "cpg pos", "cpg"]].drop_duplicates().sort_values(["CHR", "start"]).to_csv(f"cpgInput.bed", index=False, header=None, sep="\t")
 
-    snp = mqtl[["CHR", "snp", "snp POS"]]
-    snp["start"] = snp["snp POS"] - 1
-    snp[["CHR", "start", "snp POS", "snp"]].drop_duplicates().sort_values(["CHR", "start"]).to_csv(f"snpInput.bed", index=False, header=None, sep="\t")
+    snp = mqtl[["CHR", "snp", "snp pos"]]
+    snp["start"] = snp["snp pos"] - 1
+    snp[["CHR", "start", "snp pos", "snp"]].drop_duplicates().sort_values(["CHR", "start"]).to_csv(f"snpInput.bed", index=False, header=None, sep="\t")
 
     """
 }
